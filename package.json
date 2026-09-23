@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx tests/foundation.test.ts && tsx tests/auth.test.ts"
+    "test": "tsx tests/foundation.test.ts && tsx tests/auth.test.ts && tsx tests/rehab-data-model.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

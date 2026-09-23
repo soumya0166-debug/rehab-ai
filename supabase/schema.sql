@@ -1,7 +1,7 @@
 -- =========================================================
 -- REHAB-AI: PostgreSQL Schema (Supabase)
 -- Real-time Tele-Rehabilitation Telemetry & Clinical EMR
--- Authentication, RBAC & Row Level Security (RLS) Policies
+-- Authentication, RBAC, Exercise Models & RLS Policies
 -- =========================================================
 
 -- Enable UUID extension
@@ -62,7 +62,92 @@ create table if not exists public.caregiver_patient (
 create index if not exists idx_cgp_caregiver on public.caregiver_patient(caregiver_id);
 create index if not exists idx_cgp_patient on public.caregiver_patient(patient_id);
 
--- 5. CLINICAL PATIENT RECORDS
+-- =========================================================
+-- 5. EXERCISES & REHABILITATION DATA MODEL
+-- =========================================================
+
+-- EXERCISES TABLE
+create table if not exists public.exercises (
+  id text primary key,
+  name text not null,
+  description text not null,
+  body_part text not null,
+  difficulty text not null check (difficulty in ('beginner', 'intermediate', 'advanced')),
+  camera_view text not null check (camera_view in ('frontal', 'sagittal_left', 'sagittal_right', 'oblique_45', 'custom')),
+  required_landmarks jsonb not null default '[]'::jsonb,
+  configuration jsonb not null default '{}'::jsonb,
+  safety_notes text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_exercises_body_part on public.exercises(body_part);
+
+-- PRESCRIPTIONS TABLE
+create table if not exists public.prescriptions (
+  id uuid primary key default uuid_generate_v4(),
+  patient_id uuid not null references public.patients(id) on delete cascade,
+  exercise_id text not null references public.exercises(id) on delete cascade,
+  target_reps int not null check (target_reps > 0),
+  target_range_min numeric(5,2) not null,
+  target_range_max numeric(5,2) not null,
+  instructions text not null,
+  created_by uuid not null references public.profiles(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_prescriptions_patient on public.prescriptions(patient_id);
+create index if not exists idx_prescriptions_exercise on public.prescriptions(exercise_id);
+create index if not exists idx_prescriptions_created_by on public.prescriptions(created_by);
+
+-- SESSIONS TABLE
+create table if not exists public.sessions (
+  id uuid primary key default uuid_generate_v4(),
+  patient_id uuid not null references public.patients(id) on delete cascade,
+  exercise_id text not null references public.exercises(id) on delete cascade,
+  started_at timestamptz not null default now(),
+  completed_at timestamptz,
+  repetitions int not null default 0,
+  successful_repetitions int not null default 0,
+  incomplete_repetitions int not null default 0,
+  duration_seconds numeric(8,2) not null default 0,
+  quality_score numeric(5,2) not null default 0,
+  tracking_quality text not null default 'high' check (tracking_quality in ('high', 'medium', 'low', 'uncalibrated')),
+  status text not null default 'in_progress' check (status in ('in_progress', 'completed', 'abandoned'))
+);
+
+create index if not exists idx_sessions_patient on public.sessions(patient_id);
+create index if not exists idx_sessions_exercise on public.sessions(exercise_id);
+create index if not exists idx_sessions_status on public.sessions(status);
+
+-- SESSION_METRICS TABLE
+create table if not exists public.session_metrics (
+  id uuid primary key default uuid_generate_v4(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  average_angle numeric(5,2) not null,
+  minimum_angle numeric(5,2) not null,
+  maximum_angle numeric(5,2) not null,
+  average_rep_duration numeric(6,2) not null,
+  successful_reps int not null default 0,
+  incomplete_reps int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_session_metrics_session on public.session_metrics(session_id);
+
+-- PATIENT_FEEDBACK TABLE
+create table if not exists public.patient_feedback (
+  id uuid primary key default uuid_generate_v4(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  pain_level int not null check (pain_level between 0 and 10),
+  fatigue_level int not null check (fatigue_level between 1 and 10),
+  patient_comment text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_patient_feedback_session on public.patient_feedback(session_id);
+
+-- CLINICAL PATIENT RECORDS (EMR diagnosis)
 create table if not exists public.patient_records (
   id uuid primary key default uuid_generate_v4(),
   patient_id uuid not null references public.patients(id) on delete cascade,
@@ -77,69 +162,6 @@ create table if not exists public.patient_records (
 
 create index if not exists idx_patient_records_patient on public.patient_records(patient_id);
 
--- 6. EXERCISE PRESCRIPTIONS
-create table if not exists public.prescriptions (
-  id uuid primary key default uuid_generate_v4(),
-  patient_id uuid not null references public.patients(id) on delete cascade,
-  clinician_id uuid not null references public.profiles(id),
-  exercise_id text not null,
-  exercise_name text not null,
-  target_reps int not null default 10,
-  target_sets int not null default 3,
-  target_angle_min numeric(5,2) not null,
-  target_angle_max numeric(5,2) not null,
-  hold_duration_seconds numeric(4,1) not null default 2.0,
-  frequency_days_per_week int not null default 5,
-  notes_for_patient text,
-  is_active boolean not null default true,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists idx_prescriptions_patient on public.prescriptions(patient_id);
-
--- 7. REHABILITATION SESSIONS
-create table if not exists public.exercise_sessions (
-  id uuid primary key default uuid_generate_v4(),
-  patient_id uuid not null references public.patients(id) on delete cascade,
-  prescription_id uuid references public.prescriptions(id),
-  exercise_id text not null,
-  exercise_name text not null,
-  target_reps int not null,
-  completed_reps int not null,
-  clean_reps int not null,
-  average_rom numeric(5,2) not null,
-  peak_rom numeric(5,2) not null,
-  target_rom numeric(5,2) not null,
-  average_hold_time numeric(4,2) not null,
-  overall_score numeric(5,2) not null,
-  pain_score int check (pain_score between 0 and 10),
-  effort_rpe int check (effort_rpe between 1 and 10),
-  patient_feedback text,
-  clinician_notes text,
-  started_at timestamptz not null default now(),
-  completed_at timestamptz not null default now()
-);
-
-create index if not exists idx_sessions_patient on public.exercise_sessions(patient_id);
-
--- 8. REP-BY-REP TELEMETRY
-create table if not exists public.rep_telemetry (
-  id uuid primary key default uuid_generate_v4(),
-  session_id uuid not null references public.exercise_sessions(id) on delete cascade,
-  rep_number int not null,
-  peak_angle numeric(5,2) not null,
-  target_angle_min numeric(5,2) not null,
-  hold_duration_achieved numeric(4,2) not null,
-  target_hold_duration numeric(4,2) not null,
-  score numeric(5,2) not null,
-  passed boolean not null default true,
-  compensations_detected jsonb default '[]'::jsonb,
-  duration_ms int not null,
-  recorded_at timestamptz not null default now()
-);
-
-create index if not exists idx_rep_telemetry_session on public.rep_telemetry(session_id);
-
 -- =========================================================
 -- SECURITY FUNCTIONS & HELPERS
 -- =========================================================
@@ -150,6 +172,15 @@ returns boolean language sql stable security definer as $$
   select exists (
     select 1 from public.profiles
     where id = auth.uid() and role = 'ADMIN'
+  );
+$$;
+
+-- Helper to check if current user is a PHYSIOTHERAPIST
+create or replace function public.is_physiotherapist()
+returns boolean language sql stable security definer as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'PHYSIOTHERAPIST'
   );
 $$;
 
@@ -187,20 +218,20 @@ alter table public.profiles enable row level security;
 alter table public.patients enable row level security;
 alter table public.clinician_patient enable row level security;
 alter table public.caregiver_patient enable row level security;
-alter table public.patient_records enable row level security;
+alter table public.exercises enable row level security;
 alter table public.prescriptions enable row level security;
-alter table public.exercise_sessions enable row level security;
-alter table public.rep_telemetry enable row level security;
+alter table public.sessions enable row level security;
+alter table public.session_metrics enable row level security;
+alter table public.patient_feedback enable row level security;
+alter table public.patient_records enable row level security;
 
 -- ---------------------------------------------------------
 -- PROFILES POLICIES
 -- ---------------------------------------------------------
--- 1. Users can view their own profile
 create policy "Users can view own profile"
   on public.profiles for select
   using (auth.uid() = id or public.is_admin());
 
--- 2. Clinicians can view profiles of their assigned patients
 create policy "Clinicians can view assigned patient profiles"
   on public.profiles for select
   using (
@@ -211,7 +242,6 @@ create policy "Clinicians can view assigned patient profiles"
     )
   );
 
--- 3. Caregivers can view profiles of their authorized patients
 create policy "Caregivers can view authorized patient profiles"
   on public.profiles for select
   using (
@@ -222,21 +252,17 @@ create policy "Caregivers can view authorized patient profiles"
     )
   );
 
--- 4. Users can update their own profile, but CANNOT tamper with their role (role change requires admin)
 create policy "Users can update own profile non-role fields"
   on public.profiles for update
   using (auth.uid() = id or public.is_admin())
   with check (
-    -- Admins can update any field including role
     public.is_admin()
     or (
-      -- Normal users cannot change their role
       auth.uid() = id
       and role = (select p.role from public.profiles p where p.id = auth.uid())
     )
   );
 
--- 5. Insert policy for authenticated user
 create policy "Users can insert own profile"
   on public.profiles for insert
   with check (auth.uid() = id or public.is_admin());
@@ -244,7 +270,6 @@ create policy "Users can insert own profile"
 -- ---------------------------------------------------------
 -- PATIENTS POLICIES
 -- ---------------------------------------------------------
--- Patient can only access their own patient data
 create policy "Patients can view own patient record"
   on public.patients for select
   using (
@@ -297,6 +322,130 @@ create policy "Patients or admins can manage caregiver authorizations"
   );
 
 -- ---------------------------------------------------------
+-- EXERCISES POLICIES
+-- ---------------------------------------------------------
+-- All authenticated users can view clinical exercise catalog
+create policy "Authenticated users can view exercise catalog"
+  on public.exercises for select
+  using (auth.uid() is not null);
+
+-- Clinicians and Admins can create or update exercise catalog definitions
+create policy "Clinicians and Admins can manage exercise definitions"
+  on public.exercises for all
+  using (public.is_physiotherapist() or public.is_admin())
+  with check (public.is_physiotherapist() or public.is_admin());
+
+-- ---------------------------------------------------------
+-- PRESCRIPTIONS POLICIES
+-- ---------------------------------------------------------
+-- Patients view own; Clinicians view assigned; Caregivers view authorized; Admins view all
+create policy "Authorized users can read prescriptions"
+  on public.prescriptions for select
+  using (
+    patient_id = public.get_my_patient_id()
+    or public.is_assigned_clinician(patient_id)
+    or public.is_authorized_caregiver(patient_id)
+    or public.is_admin()
+  );
+
+create policy "Clinicians can write prescriptions for assigned patients"
+  on public.prescriptions for insert
+  with check (
+    (public.is_assigned_clinician(patient_id) and created_by = auth.uid())
+    or public.is_admin()
+  );
+
+create policy "Clinicians can update prescriptions for assigned patients"
+  on public.prescriptions for update
+  using (
+    (public.is_assigned_clinician(patient_id) and created_by = auth.uid())
+    or public.is_admin()
+  );
+
+-- ---------------------------------------------------------
+-- SESSIONS POLICIES
+-- ---------------------------------------------------------
+-- Patients view own; Clinicians view assigned; Caregivers view authorized; Admins view all
+create policy "Authorized users can read sessions"
+  on public.sessions for select
+  using (
+    patient_id = public.get_my_patient_id()
+    or public.is_assigned_clinician(patient_id)
+    or public.is_authorized_caregiver(patient_id)
+    or public.is_admin()
+  );
+
+create policy "Patients can insert their own exercise sessions"
+  on public.sessions for insert
+  with check (
+    patient_id = public.get_my_patient_id()
+    or public.is_admin()
+  );
+
+create policy "Patients can update their ongoing sessions"
+  on public.sessions for update
+  using (
+    patient_id = public.get_my_patient_id()
+    or public.is_admin()
+  );
+
+-- ---------------------------------------------------------
+-- SESSION_METRICS POLICIES
+-- ---------------------------------------------------------
+create policy "Authorized users can read session metrics"
+  on public.session_metrics for select
+  using (
+    exists (
+      select 1 from public.sessions s
+      where s.id = session_metrics.session_id
+        and (
+          s.patient_id = public.get_my_patient_id()
+          or public.is_assigned_clinician(s.patient_id)
+          or public.is_authorized_caregiver(s.patient_id)
+          or public.is_admin()
+        )
+    )
+  );
+
+create policy "Patients can record session metrics"
+  on public.session_metrics for insert
+  with check (
+    exists (
+      select 1 from public.sessions s
+      where s.id = session_metrics.session_id
+        and (s.patient_id = public.get_my_patient_id() or public.is_admin())
+    )
+  );
+
+-- ---------------------------------------------------------
+-- PATIENT_FEEDBACK POLICIES
+-- ---------------------------------------------------------
+create policy "Authorized users can read patient feedback"
+  on public.patient_feedback for select
+  using (
+    exists (
+      select 1 from public.sessions s
+      where s.id = patient_feedback.session_id
+        and (
+          s.patient_id = public.get_my_patient_id()
+          or public.is_assigned_clinician(s.patient_id)
+          or public.is_authorized_caregiver(s.patient_id)
+          or public.is_admin()
+        )
+    )
+  );
+
+create policy "Patients can submit session feedback"
+  on public.patient_feedback for insert
+  with check (
+    exists (
+      select 1 from public.sessions s
+      where s.id = patient_feedback.session_id
+        and (s.patient_id = public.get_my_patient_id() or public.is_admin())
+    )
+  );
+
+-- ---------------------------------------------------------
 -- PATIENT_RECORDS POLICIES
 -- ---------------------------------------------------------
 create policy "Authorized users can read patient records"
@@ -319,89 +468,8 @@ create policy "Clinicians and admins can modify patient records"
     or public.is_admin()
   );
 
--- ---------------------------------------------------------
--- PRESCRIPTIONS POLICIES
--- ---------------------------------------------------------
-create policy "Authorized users can read prescriptions"
-  on public.prescriptions for select
-  using (
-    patient_id = public.get_my_patient_id()
-    or public.is_assigned_clinician(patient_id)
-    or public.is_authorized_caregiver(patient_id)
-    or public.is_admin()
-  );
-
-create policy "Clinicians can write prescriptions for assigned patients"
-  on public.prescriptions for insert
-  with check (
-    (public.is_assigned_clinician(patient_id) and clinician_id = auth.uid())
-    or public.is_admin()
-  );
-
-create policy "Clinicians can update prescriptions for assigned patients"
-  on public.prescriptions for update
-  using (
-    (public.is_assigned_clinician(patient_id) and clinician_id = auth.uid())
-    or public.is_admin()
-  );
-
--- ---------------------------------------------------------
--- EXERCISE_SESSIONS POLICIES
--- ---------------------------------------------------------
-create policy "Authorized users can read exercise sessions"
-  on public.exercise_sessions for select
-  using (
-    patient_id = public.get_my_patient_id()
-    or public.is_assigned_clinician(patient_id)
-    or public.is_authorized_caregiver(patient_id)
-    or public.is_admin()
-  );
-
-create policy "Patients can insert their own exercise sessions"
-  on public.exercise_sessions for insert
-  with check (
-    patient_id = public.get_my_patient_id()
-    or public.is_admin()
-  );
-
-create policy "Clinicians can review exercise sessions"
-  on public.exercise_sessions for update
-  using (
-    public.is_assigned_clinician(patient_id)
-    or public.is_admin()
-  );
-
--- ---------------------------------------------------------
--- REP_TELEMETRY POLICIES
--- ---------------------------------------------------------
-create policy "Authorized users can read rep telemetry"
-  on public.rep_telemetry for select
-  using (
-    exists (
-      select 1 from public.exercise_sessions s
-      where s.id = rep_telemetry.session_id
-        and (
-          s.patient_id = public.get_my_patient_id()
-          or public.is_assigned_clinician(s.patient_id)
-          or public.is_authorized_caregiver(s.patient_id)
-          or public.is_admin()
-        )
-    )
-  );
-
-create policy "Patients can insert telemetry for their own sessions"
-  on public.rep_telemetry for insert
-  with check (
-    exists (
-      select 1 from public.exercise_sessions s
-      where s.id = rep_telemetry.session_id
-        and (s.patient_id = public.get_my_patient_id() or public.is_admin())
-    )
-  );
-
 -- =========================================================
 -- AUTOMATED USER REGISTRATION TRIGGER
--- Synchronizes auth.users into public.profiles & public.patients
 -- =========================================================
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -410,7 +478,6 @@ declare
   v_full_name text;
   v_language text;
 begin
-  -- Resolve role safely from raw_user_meta_data or default to 'PATIENT'
   begin
     v_role := (new.raw_user_meta_data->>'role')::user_role_enum;
   exception when others then
@@ -427,7 +494,6 @@ begin
       email = excluded.email,
       updated_at = now();
 
-  -- If registered as PATIENT, automatically create corresponding patient record
   if v_role = 'PATIENT' then
     insert into public.patients (profile_id, created_at)
     values (new.id, now())
@@ -438,8 +504,192 @@ begin
 end;
 $$;
 
--- Drop trigger if exists and recreate
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- =========================================================
+-- SEED DATA: EXACTLY THREE INITIAL EXERCISES
+-- Prototype configurations clearly marked as configurable by a qualified physiotherapist
+-- =========================================================
+
+insert into public.exercises (
+  id,
+  name,
+  description,
+  body_part,
+  difficulty,
+  camera_view,
+  required_landmarks,
+  configuration,
+  safety_notes
+) values
+(
+  'elbow-flexion',
+  'Elbow Flexion',
+  'Controlled concentric and eccentric flexion of the elbow joint to restore biceps and brachialis functional mobility.',
+  'upper_extremity',
+  'beginner',
+  'sagittal_left',
+  '["LEFT_SHOULDER", "LEFT_ELBOW", "LEFT_WRIST", "LEFT_HIP"]'::jsonb,
+  '{
+    "isPrototype": true,
+    "clinicalDisclaimer": "PROTOTYPE CONFIGURATION: Range of motion targets and cadence must be customized and approved by a qualified physiotherapist.",
+    "targetJoint": "left_elbow",
+    "startingCondition": {
+      "posture": "seated_or_standing_upright",
+      "startAngleDegrees": 150.0,
+      "maxAngleDeviation": 15.0,
+      "settleTimeMs": 1000
+    },
+    "movementPhases": ["START", "CONCENTRIC_FLEXION", "PEAK_HOLD", "ECCENTRIC_EXTENSION", "COMPLETED"],
+    "repetitionLogic": {
+      "startAngle": 150.0,
+      "peakFlexionMinAngle": 35.0,
+      "peakFlexionMaxAngle": 55.0,
+      "returnExtensionThreshold": 140.0,
+      "minimumHoldSeconds": 1.5
+    },
+    "targetMeasurement": {
+      "metric": "elbow_flexion_angle_degrees",
+      "defaultMinAngle": 40.0,
+      "defaultMaxAngle": 150.0,
+      "unit": "degrees"
+    },
+    "feedbackRules": [
+      {
+        "id": "trunk_sway",
+        "condition": "trunk_lean_greater_than_12_degrees",
+        "cue": "Keep your upper body still. Avoid leaning backwards."
+      },
+      {
+        "id": "shoulder_elevation",
+        "condition": "shoulder_hike_detected",
+        "cue": "Keep your shoulder relaxed and elbow anchored at your side."
+      }
+    ],
+    "cameraPositioningGuidance": {
+      "distanceMeters": 2.0,
+      "recommendedAngle": "Side sagittal view (90 degrees to body)",
+      "cameraHeight": "Chest height",
+      "instructions": "Position camera at side profile. Ensure shoulder, elbow, and wrist remain in frame throughout the entire movement."
+    }
+  }'::jsonb,
+  'PROTOTYPE CONFIGURATION: Must be reviewed and adjusted by a qualified clinician. Discontinue immediately if acute anterior elbow pain or joint impingement occurs.'
+),
+(
+  'shoulder-raise',
+  'Shoulder Raise',
+  'Active assisted or unassisted glenohumeral arm raise in the scapular plane to rehabilitate subacromial clearance and shoulder mobility.',
+  'upper_extremity',
+  'intermediate',
+  'frontal',
+  '["LEFT_SHOULDER", "RIGHT_SHOULDER", "LEFT_ELBOW", "RIGHT_ELBOW", "LEFT_HIP", "RIGHT_HIP"]'::jsonb,
+  '{
+    "isPrototype": true,
+    "clinicalDisclaimer": "PROTOTYPE CONFIGURATION: Elevation targets and cadence must be customized and approved by a qualified physiotherapist.",
+    "targetJoint": "left_shoulder",
+    "startingCondition": {
+      "posture": "standing_feet_hip_width",
+      "startAngleDegrees": 20.0,
+      "maxAngleDeviation": 10.0,
+      "settleTimeMs": 1200
+    },
+    "movementPhases": ["START", "ASCENT_SCAPTION", "PEAK_HOLD", "CONTROLLED_DESCENT", "COMPLETED"],
+    "repetitionLogic": {
+      "startAngle": 20.0,
+      "peakFlexionMinAngle": 85.0,
+      "peakFlexionMaxAngle": 110.0,
+      "returnExtensionThreshold": 30.0,
+      "minimumHoldSeconds": 2.0
+    },
+    "targetMeasurement": {
+      "metric": "shoulder_elevation_angle_degrees",
+      "defaultMinAngle": 85.0,
+      "defaultMaxAngle": 110.0,
+      "unit": "degrees"
+    },
+    "feedbackRules": [
+      {
+        "id": "shoulder_shrug",
+        "condition": "trapezius_hiking_above_threshold",
+        "cue": "Relax neck muscles. Do not shrug your shoulder toward your ear."
+      },
+      {
+        "id": "lateral_trunk_lean",
+        "condition": "lateral_lean_greater_than_10_degrees",
+        "cue": "Maintain an upright spine without leaning sideways."
+      }
+    ],
+    "cameraPositioningGuidance": {
+      "distanceMeters": 2.5,
+      "recommendedAngle": "Frontal view directly facing camera",
+      "cameraHeight": "Mid-torso height",
+      "instructions": "Step back until both shoulders, elbows, and hips are clearly visible in the camera frame."
+    }
+  }'::jsonb,
+  'PROTOTYPE CONFIGURATION: Must be reviewed and adjusted by a qualified clinician. Avoid exceeding prescribed pain-free abduction angles; do not force range if subacromial pinch is experienced.'
+),
+(
+  'sit-to-stand',
+  'Sit-to-Stand',
+  'Functional closed-chain lower body biomechanical transfer enhancing quadriceps, gluteal strength, and postural stability.',
+  'lower_extremity',
+  'intermediate',
+  'oblique_45',
+  '["LEFT_HIP", "RIGHT_HIP", "LEFT_KNEE", "RIGHT_KNEE", "LEFT_ANKLE", "RIGHT_ANKLE", "LEFT_SHOULDER", "RIGHT_SHOULDER"]'::jsonb,
+  '{
+    "isPrototype": true,
+    "clinicalDisclaimer": "PROTOTYPE CONFIGURATION: Chair height, repetition count, and support assistance must be prescribed by a qualified physiotherapist.",
+    "targetJoint": "bilateral_knee_and_hip",
+    "startingCondition": {
+      "posture": "seated_firm_chair_feet_flat",
+      "startAngleDegrees": 90.0,
+      "maxAngleDeviation": 15.0,
+      "settleTimeMs": 1500
+    },
+    "movementPhases": ["SEATED", "FORWARD_WEIGHT_TRANSFER", "EXTENSION_DRIVE", "STANDING_LOCKOUT", "CONTROLLED_DESCENT", "COMPLETED"],
+    "repetitionLogic": {
+      "startAngle": 90.0,
+      "peakFlexionMinAngle": 170.0,
+      "peakFlexionMaxAngle": 180.0,
+      "returnExtensionThreshold": 95.0,
+      "minimumHoldSeconds": 1.0
+    },
+    "targetMeasurement": {
+      "metric": "knee_extension_angle_degrees",
+      "defaultMinAngle": 90.0,
+      "defaultMaxAngle": 175.0,
+      "unit": "degrees"
+    },
+    "feedbackRules": [
+      {
+        "id": "knee_valgus",
+        "condition": "knee_inward_deviation_greater_than_15mm",
+        "cue": "Keep knees tracking over second toes. Avoid knees caving inward."
+      },
+      {
+        "id": "asymmetrical_weight_bearing",
+        "condition": "weight_asymmetry_greater_than_20_percent",
+        "cue": "Distribute weight symmetrically through both heels."
+      }
+    ],
+    "cameraPositioningGuidance": {
+      "distanceMeters": 3.0,
+      "recommendedAngle": "45-degree front-diagonal or side sagittal view",
+      "cameraHeight": "Hip height",
+      "instructions": "Place camera to capture whole chair and standing body from head to feet. Ensure solid lighting and a stable, armless chair."
+    }
+  }'::jsonb,
+  'PROTOTYPE CONFIGURATION: Must be reviewed and adjusted by a qualified clinician. Have a stable support surface nearby if balance or vestibular impairments exist.'
+)
+on conflict (id) do update set
+  name = excluded.name,
+  description = excluded.description,
+  body_part = excluded.body_part,
+  difficulty = excluded.difficulty,
+  camera_view = excluded.camera_view,
+  required_landmarks = excluded.required_landmarks,
+  configuration = excluded.configuration,
+  safety_notes = excluded.safety_notes;
