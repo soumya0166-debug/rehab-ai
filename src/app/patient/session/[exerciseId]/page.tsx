@@ -134,6 +134,7 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
         stateMachineRef.current.reset();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercise, currentLang]);
 
   // Sync voice settings & language

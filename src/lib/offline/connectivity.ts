@@ -86,11 +86,9 @@ export function useNetworkStatus(): {
 } {
   // Safe default for SSR
   const [online, setOnline] = typeof window !== 'undefined'
-    ? // eslint-disable-next-line react-hooks/rules-of-hooks
-      require('react').useState(connectivity.isOnline())
+    ? require('react').useState(connectivity.isOnline())
     : [true, () => {}];
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   require('react').useEffect(() => {
     const unsubscribe = connectivity.subscribe((status: ConnectivityStatus) => {
       setOnline(status === 'online');

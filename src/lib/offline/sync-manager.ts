@@ -321,13 +321,10 @@ export const syncManager = SyncManager.getInstance();
 export function useSyncStatus(): SyncStatusInfo & {
   syncNow: () => Promise<{ total: number; succeeded: number; failed: number }>;
 } {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [statusInfo, setStatusInfo] = typeof window !== 'undefined'
-    ? // eslint-disable-next-line react-hooks/rules-of-hooks
-      require('react').useState(syncManager.getStatusInfo())
+    ? require('react').useState(syncManager.getStatusInfo())
     : [syncManager.getStatusInfo(), () => {}];
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   require('react').useEffect(() => {
     const unsubscribe = syncManager.subscribe((info: SyncStatusInfo) => {
       setStatusInfo(info);
