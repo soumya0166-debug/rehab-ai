@@ -6,8 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "test": "tsx tests/foundation.test.ts && tsx tests/auth.test.ts && tsx tests/rehab-data-model.test.ts && tsx tests/exercise-engine.test.ts && tsx tests/ai-layer.test.ts && tsx tests/voice-and-i18n.test.ts && tsx tests/offline-sync.test.ts"
+    "lint": "eslint src/",
+    "test": "tsx tests/foundation.test.ts && tsx tests/auth.test.ts && tsx tests/rehab-data-model.test.ts && tsx tests/exercise-engine.test.ts && tsx tests/ai-layer.test.ts && tsx tests/voice-and-i18n.test.ts && tsx tests/offline-sync.test.ts && tsx tests/e2e-workflow.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
