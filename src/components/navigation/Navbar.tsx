@@ -20,6 +20,8 @@ import { resetDemoData } from '@/lib/data/store';
 import { USER_PERSONAS, getActivePersona, setActivePersona, UserPersona } from '@/lib/auth/rbac';
 import { useAuth } from '@/lib/auth/auth-context';
 import { normalizeRole } from '@/lib/auth/auth-service';
+import { SyncStatusBadge } from '@/components/offline/SyncStatusBadge';
+import { EmergencyGuidanceModal } from '@/components/common/EmergencyGuidanceModal';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -202,6 +204,10 @@ export function Navbar() {
               </div>
             )}
           </div>
+
+          {/* Emergency & Offline Sync Indicators */}
+          <SyncStatusBadge />
+          <EmergencyGuidanceModal />
 
           {/* Reset Demo Button */}
           <button

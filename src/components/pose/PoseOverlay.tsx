@@ -84,24 +84,55 @@ export function PoseOverlay({
         </div>
       </div>
 
-      {/* Middle Feedback Coaching Banner */}
-      <div className="flex flex-col items-center justify-center my-auto">
-        {feedbackBanner && (
-          <div className="bg-slate-950/90 backdrop-blur-lg px-6 py-3 rounded-2xl border border-slate-700/80 shadow-2xl max-w-md text-center pointer-events-auto transition-all animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-widest ${
-                  phaseColors[currentPhase] || 'bg-slate-800'
-                }`}
+      {/* Middle Feedback Coaching Banner - High Clarity Patient Feedback */}
+      <div className="flex flex-col items-center justify-center my-auto pointer-events-none">
+        {(() => {
+          // Determine high-clarity primary feedback based on biomechanical state
+          let primaryCue = '✓ Good movement';
+          let cueStyle = 'bg-emerald-500/90 text-white border-emerald-400/80 shadow-emerald-950/50';
+          let isWarning = false;
+          let isUnavailable = false;
+
+          const lowerBanner = feedbackBanner.toLowerCase();
+
+          if (lowerBanner.includes('tracking') || lowerBanner.includes('camera') || lowerBanner.includes('outside frame') || lowerBanner.includes('occluded')) {
+            primaryCue = '📷 Tracking unavailable';
+            cueStyle = 'bg-slate-900/95 text-slate-200 border-slate-700 shadow-slate-950/80';
+            isUnavailable = true;
+          } else if (
+            currentPhase === 'INCOMPLETE_REP' ||
+            lowerBanner.includes('outside') ||
+            lowerBanner.includes('compensat') ||
+            lowerBanner.includes('warning') ||
+            lowerBanner.includes('too far') ||
+            lowerBanner.includes('adjust') ||
+            lowerBanner.includes('slow down')
+          ) {
+            primaryCue = '⚠ Movement outside configured target';
+            cueStyle = 'bg-amber-500/90 text-slate-950 border-amber-300 font-bold shadow-amber-950/50';
+            isWarning = true;
+          } else {
+            primaryCue = '✓ Good movement';
+            cueStyle = 'bg-emerald-500/95 text-white border-emerald-300 shadow-emerald-950/50';
+          }
+
+          return (
+            <div className="flex flex-col items-center gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+              <div
+                role="status"
+                aria-live="polite"
+                className={`px-6 py-2.5 rounded-full border shadow-2xl backdrop-blur-md text-base sm:text-lg font-bold tracking-wide flex items-center gap-2 ${cueStyle}`}
               >
-                {currentPhase.replace('_', ' ')}
-              </span>
+                <span>{primaryCue}</span>
+              </div>
+              {feedbackBanner && !isUnavailable && (
+                <div className="bg-slate-950/80 backdrop-blur-sm px-4 py-1 rounded-full text-xs font-medium text-slate-300 border border-slate-800 shadow-sm max-w-sm text-center">
+                  {feedbackBanner}
+                </div>
+              )}
             </div>
-            <div className="text-base font-semibold text-white tracking-tight">
-              {feedbackBanner}
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Bottom HUD: Live Angle Gauge + Actions */}

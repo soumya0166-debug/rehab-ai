@@ -19,6 +19,8 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ProductDisclaimer } from '@/components/common/ProductDisclaimer';
 
 interface HistoricalSessionItem {
   id: string;
@@ -238,7 +240,19 @@ export default function PatientHistoryPage() {
             </div>
           );
         })}
+
+        {filteredItems.length === 0 && (
+          <EmptyState
+            icon={History}
+            title="No sessions found"
+            description="You do not have any recorded sessions matching this exercise filter."
+            actionLabel="Reset Filter"
+            onAction={() => setSelectedFilter('all')}
+          />
+        )}
       </div>
+
+      <ProductDisclaimer variant="compact" className="mt-8" />
     </div>
   );
 }

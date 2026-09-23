@@ -16,6 +16,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/ui/empty-state';
 import { getPatientsList } from '@/lib/db/repository';
 
 export default function ClinicianPatientsPage() {
@@ -184,6 +185,20 @@ export default function ClinicianPatientsPage() {
               })}
             </tbody>
           </table>
+          {filtered.length === 0 && (
+            <div className="p-8">
+              <EmptyState
+                icon={Users}
+                title="No matching patients found"
+                description="Try adjusting your search query or status filter to locate patient records."
+                actionLabel="Clear Filters"
+                onAction={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                }}
+              />
+            </div>
+          )}
         </div>
       </Card>
     </div>

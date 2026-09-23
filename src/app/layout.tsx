@@ -6,6 +6,8 @@ import { AuthProvider } from '@/lib/auth/auth-context';
 
 const inter = Inter({ subsets: ['latin'] });
 
+import { Footer } from '@/components/navigation/Footer';
+
 export const metadata: Metadata = {
   title: 'REHAB-AI | AI-Powered Home Rehabilitation & Recovery Assistant',
   description: 'Clinical-grade computer vision rehabilitation observing movement quality, measuring joint angles in real time, and tracking tele-recovery progress for physiotherapists.',
@@ -24,6 +26,7 @@ export default function RootLayout({
           <main className="flex-1">
             {children}
           </main>
+          <Footer />
         </AuthProvider>
       </body>
     </html>

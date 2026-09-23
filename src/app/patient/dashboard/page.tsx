@@ -24,6 +24,7 @@ import { Alert } from '@/components/ui/alert';
 import { useAuth } from '@/lib/auth/auth-context';
 import { SEEDED_EXERCISE_DEFINITIONS } from '@/lib/exercises/definitions';
 import { speechEngine } from '@/lib/voice/speech-engine';
+import { ProductDisclaimer } from '@/components/common/ProductDisclaimer';
 
 export default function PatientDashboardPage() {
   const { user } = useAuth();
@@ -274,6 +275,8 @@ export default function PatientDashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ProductDisclaimer variant="card" className="mt-6" />
     </div>
   );
 }

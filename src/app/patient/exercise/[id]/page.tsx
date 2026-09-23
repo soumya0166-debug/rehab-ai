@@ -39,6 +39,10 @@ import {
   recordSessionMetrics,
   submitPatientFeedback,
 } from '@/lib/services/rehab-service';
+import { syncManager, generateLocalSessionId } from '@/lib/offline/sync-manager';
+import { SyncStatusBadge } from '@/components/offline/SyncStatusBadge';
+import { ProductDisclaimer } from '@/components/common/ProductDisclaimer';
+import { EmergencyGuidanceModal } from '@/components/common/EmergencyGuidanceModal';
 import { LiveSessionState, RepetitionPhase, RepetitionResult } from '@/types/exercises';
 import { CameraReadinessState, DeveloperDebugInfo, PoseFrame, TrackingQualityLevel } from '@/types/pose';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -262,13 +266,20 @@ export default function LiveExerciseSessionPage({
   };
 
   const handleSaveAndExit = async () => {
-    if (!sessionSummary) return;
+    if (!sessionSummary || !exercise) return;
     setIsSavingRecord(true);
 
     try {
-      const sid = dbSessionId || `sess-${Date.now()}`;
+      const sid = dbSessionId || generateLocalSessionId();
 
-      await completeSession(sid, {
+      await syncManager.saveAndSyncSession({
+        id: sid,
+        patientId: user?.id || 'demo-patient',
+        exerciseId: exercise.id,
+        startedAt: sessionStartTimeRef.current
+          ? new Date(sessionStartTimeRef.current).toISOString()
+          : new Date().toISOString(),
+        completedAt: new Date().toISOString(),
         repetitions: sessionSummary.totalReps,
         successfulRepetitions: sessionSummary.successfulReps,
         incompleteRepetitions: sessionSummary.incompleteReps,
@@ -276,23 +287,19 @@ export default function LiveExerciseSessionPage({
         qualityScore: sessionSummary.qualityScore,
         trackingQuality: trackingQuality,
         status: 'completed',
-      });
-
-      await recordSessionMetrics({
-        sessionId: sid,
-        averageAngle: sessionSummary.averageAngle,
-        minimumAngle: sessionSummary.minimumAngle,
-        maximumAngle: sessionSummary.maximumAngle,
-        averageRepDuration: sessionSummary.averageRepDuration,
-        successfulReps: sessionSummary.successfulReps,
-        incompleteReps: sessionSummary.incompleteReps,
-      });
-
-      await submitPatientFeedback({
-        sessionId: sid,
-        painLevel: painLevel,
-        fatigueLevel: fatigueLevel,
-        patientComment: patientComment.trim() || undefined,
+        metrics: {
+          averageAngle: sessionSummary.averageAngle,
+          minimumAngle: sessionSummary.minimumAngle,
+          maximumAngle: sessionSummary.maximumAngle,
+          averageRepDuration: sessionSummary.averageRepDuration,
+          successfulReps: sessionSummary.successfulReps,
+          incompleteReps: sessionSummary.incompleteReps,
+        },
+        feedback: {
+          painLevel: painLevel,
+          fatigueLevel: fatigueLevel,
+          patientComment: patientComment.trim() || undefined,
+        },
       });
 
       setIsSavedSuccessfully(true);
@@ -301,7 +308,7 @@ export default function LiveExerciseSessionPage({
       }, 1500);
     } catch (err) {
       console.error('Failed to save session:', err);
-      // Still allow returning to dashboard
+      // Still allow returning to dashboard safely
       router.push('/patient/dashboard');
     } finally {
       setIsSavingRecord(false);
@@ -422,6 +429,9 @@ export default function LiveExerciseSessionPage({
           <p className="text-sm text-slate-400">
             Great job! Your movement metrics were analyzed locally and are ready to save.
           </p>
+          <div className="flex justify-center pt-1">
+            <SyncStatusBadge />
+          </div>
         </div>
 
         {/* Metrics Summary Card */}
@@ -639,16 +649,20 @@ export default function LiveExerciseSessionPage({
           </div>
         </div>
 
-        {(sessionState === 'active_session' || sessionState === 'paused') && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCompleteSession}
-            className="text-xs"
-          >
-            Finish Early
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <SyncStatusBadge />
+          <EmergencyGuidanceModal />
+          {(sessionState === 'active_session' || sessionState === 'paused') && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCompleteSession}
+              className="text-xs"
+            >
+              Finish Early
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Main Camera + Pose View */}
