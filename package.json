@@ -7,11 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx tests/foundation.test.ts && tsx tests/auth.test.ts && tsx tests/rehab-data-model.test.ts && tsx tests/exercise-engine.test.ts"
+    "test": "tsx tests/foundation.test.ts && tsx tests/auth.test.ts && tsx tests/rehab-data-model.test.ts && tsx tests/exercise-engine.test.ts && tsx tests/ai-layer.test.ts && tsx tests/voice-and-i18n.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.1",
+    "ai": "^7.0.112",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "lucide-react": "^1.47.0",
@@ -19,7 +20,8 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "recharts": "^3.10.1",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

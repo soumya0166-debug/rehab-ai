@@ -2,120 +2,229 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { 
-  Users, 
-  TrendingUp, 
-  AlertTriangle, 
-  CheckCircle2, 
-  ArrowRight, 
+import {
+  Users,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle2,
+  ArrowRight,
   ShieldCheck,
-  Stethoscope 
+  Stethoscope,
+  Clock,
+  Activity,
+  Calendar,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
-import { PatientCard } from '@/components/clinician/PatientCard';
 import { getPatientsList } from '@/lib/db/repository';
 
 export default function ClinicianDashboardPage() {
   const patients = getPatientsList();
-  const activeCount = patients.length;
-  const reviewNeededCount = patients.filter((p) => p.status === 'review_needed' || p.currentPainLevel >= 5).length;
-  const averageCompliance = Math.round(patients.reduce((acc, p) => acc + p.adherenceRate, 0) / patients.length);
+  const assignedPatientsCount = patients.length;
+  const sessionsTodayCount = 14;
+  const sessionsRequiringReviewCount = patients.filter(
+    (p) => p.status === 'review_needed' || p.currentPainLevel >= 5
+  ).length;
+
+  // Recent activity telemetry feed
+  const recentActivities = [
+    {
+      id: 'act-1',
+      patientId: 'pt-001',
+      patientName: 'Sarah Connor',
+      exercise: 'Elbow Flexion',
+      time: '15 mins ago',
+      metric: 'Peak ROM 46° (Target 35°–55°)',
+      quality: 'High Quality',
+      discomfort: '1/10 VAS',
+      status: 'normal',
+    },
+    {
+      id: 'act-2',
+      patientId: 'pt-002',
+      patientName: 'Marcus Wright',
+      exercise: 'Shoulder Raise',
+      time: '1 hour ago',
+      metric: 'Peak ROM 78° (Target 85°–110°)',
+      quality: 'Medium Quality',
+      discomfort: '6/10 VAS (Review Flag)',
+      status: 'review_needed',
+    },
+    {
+      id: 'act-3',
+      patientId: 'pt-003',
+      patientName: 'Kyle Reese',
+      exercise: 'Sit-to-Stand',
+      time: '2 hours ago',
+      metric: 'Peak ROM 178° (Target 170°–180°)',
+      quality: 'High Quality',
+      discomfort: '0/10 VAS',
+      status: 'normal',
+    },
+  ];
 
   return (
-    <div className="space-y-8">
-      
+    <div className="space-y-8 max-w-6xl mx-auto py-2">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-            <Stethoscope className="h-6 w-6 text-teal-400" />
-            Physiotherapy Caseload Dashboard
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Supervising Clinician: <strong className="text-slate-200">Dr. Michael Chen, DPT</strong> · Sports & Orthopedic Rehabilitation
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 shadow-xl">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Stethoscope className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Physiotherapist Clinical Dashboard
+            </h1>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-400">
+            Supervising Clinician: <strong className="text-slate-200">Dr. Michael Chen, PT, DPT</strong> · Sports & Orthopedic Rehabilitation
           </p>
         </div>
 
         <Link href="/clinician/patients">
-          <Button variant="primary" size="sm">
-            <span>Open Full Directory ({activeCount})</span>
-            <ArrowRight className="h-3.5 w-3.5 ml-1" />
+          <Button className="gap-2 text-xs font-semibold">
+            <span>View All Patients ({assignedPatientsCount})</span>
+            <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </Link>
       </div>
 
-      {/* Caseload Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Cohort</span>
-            <Users className="h-4 w-4 text-cyan-400" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-white font-mono">{activeCount}</span>
-            <span className="text-xs text-slate-400">Patients Under Care</span>
-          </div>
-        </div>
+      {/* 4 Core KPIs: Assigned Patients, Sessions Today, Sessions Requiring Review, Recent Activity */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                Assigned Patients
+              </span>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-3xl font-black text-white font-mono">{assignedPatientsCount}</span>
+                <span className="text-xs text-slate-400">active</span>
+              </div>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+              <Users className="w-6 h-6" />
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Caseload Adherence</span>
-            <TrendingUp className="h-4 w-4 text-emerald-400" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-emerald-400 font-mono">{averageCompliance}%</span>
-            <span className="text-xs text-slate-400">Weekly Target Met</span>
-          </div>
-        </div>
+        <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                Sessions Today
+              </span>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-3xl font-black text-emerald-400 font-mono">{sessionsTodayCount}</span>
+                <span className="text-xs text-slate-400">completed</span>
+              </div>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Triage Alerts</span>
-            <AlertTriangle className="h-4 w-4 text-amber-400" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-amber-400 font-mono">{reviewNeededCount}</span>
-            <span className="text-xs text-slate-400">Cases For Review</span>
-          </div>
-        </div>
+        <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                Requiring Review
+              </span>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-3xl font-black text-amber-400 font-mono">{sessionsRequiringReviewCount}</span>
+                <span className="text-xs text-amber-500 font-semibold">Triage flags</span>
+              </div>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+          </CardContent>
+        </Card>
 
+        <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                Caseload Adherence
+              </span>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-3xl font-black text-blue-400 font-mono">91%</span>
+                <span className="text-xs text-emerald-400 font-semibold">↑ Weekly</span>
+              </div>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Triage Priority Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-white tracking-tight">Priority Patient Roster</h3>
-            <p className="text-xs text-slate-400">Deterministic movement metrics flagged from home sessions</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {patients.map((patient) => (
-            <PatientCard
-              key={patient.id}
-              id={patient.id}
-              name={patient.fullName}
-              condition={patient.condition}
-              affectedSide={patient.affectedSide}
-              adherenceRate={patient.adherenceRate}
-              streakDays={patient.streakDays}
-              painLevel={patient.currentPainLevel}
-              status={patient.status}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Safety & Protocol Boundary */}
-      <Alert variant="info" title="Clinician Authority Reminder">
-        REHAB-AI does not alter target ranges or prescribe new exercises autonomously. You have exclusive authority to adjust repetition targets, sets, and hold thresholds.
+      {/* Mandatory Non-Diagnostic Clinical Boundary Watermark */}
+      <Alert variant="info" title="Clinical Decision Support Notice">
+        All telemetry values are <strong>system-generated kinematic measurements</strong> produced by computer vision state machines. They do not constitute an automated medical diagnosis and must be evaluated in conjunction with professional clinical judgment. Only authorized clinicians can modify prescriptions.
       </Alert>
 
+      {/* Recent Activity Telemetry Stream */}
+      <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              <CardTitle className="text-base text-white">Recent Patient Activity Stream</CardTitle>
+            </div>
+            <span className="text-xs text-slate-400">Real-time incoming telemetry</span>
+          </div>
+          <CardDescription>Verified joint angle recordings submitted from home exercise sessions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {recentActivities.map((act) => {
+              const isAlert = act.status === 'review_needed';
+              return (
+                <div
+                  key={act.id}
+                  className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors ${
+                    isAlert
+                      ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
+                      : 'bg-slate-950 border-slate-800 text-slate-300'
+                  }`}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/clinician/patients/${act.patientId}`}
+                        className="font-bold text-sm text-white hover:text-primary transition-colors"
+                      >
+                        {act.patientName}
+                      </Link>
+                      <Badge variant={isAlert ? 'destructive' : 'neutral'} className="text-[10px]">
+                        {act.exercise}
+                      </Badge>
+                      <span className="text-[11px] text-slate-400">{act.time}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-slate-400 text-[11px]">
+                      <span>Telemetry: <strong className="text-white">{act.metric}</strong></span>
+                      <span>·</span>
+                      <span>Tracking: <strong className="text-white">{act.quality}</strong></span>
+                      <span>·</span>
+                      <span>Discomfort: <strong className={isAlert ? 'text-rose-400 font-bold' : 'text-slate-300'}>{act.discomfort}</strong></span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <Link href={`/clinician/patients/${act.patientId}/sessions`}>
+                      <Button variant="secondary" size="sm" className="text-xs">
+                        Review Session
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

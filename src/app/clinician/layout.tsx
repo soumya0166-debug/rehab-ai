@@ -22,6 +22,7 @@ export default function ClinicianLayout({ children }: { children: React.ReactNod
   const navItems = [
     { name: 'Caseload Overview', href: '/clinician/dashboard', icon: LayoutDashboard },
     { name: 'Patient Directory', href: '/clinician/patients', icon: Users },
+    { name: 'Protocol Library', href: '/clinician/exercises', icon: Activity },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 

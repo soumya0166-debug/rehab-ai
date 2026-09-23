@@ -24,7 +24,8 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     { name: 'Dashboard', href: '/patient/dashboard', icon: LayoutDashboard },
     { name: 'My Exercises', href: '/patient/exercises', icon: Dumbbell },
     { name: 'Progress & Trends', href: '/patient/progress', icon: TrendingUp },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Session History', href: '/patient/history', icon: Activity },
+    { name: 'Profile & Language', href: '/patient/profile', icon: Settings },
   ];
 
   return (
