@@ -73,6 +73,16 @@ export async function middleware(request: NextRequest) {
     if (authCookie === 'true' && roleCookie) {
       authenticatedUserId = 'authenticated-session';
       verifiedRole = normalizeRole(roleCookie);
+    } else {
+      // Seamless demo fallback: allows frictionless previewing of all patient, clinician, caregiver portals
+      const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
+      if (isDemoMode) {
+        authenticatedUserId = 'demo-preview-session';
+        if (pathname.startsWith('/clinician')) verifiedRole = 'PHYSIOTHERAPIST';
+        else if (pathname.startsWith('/caregiver')) verifiedRole = 'CAREGIVER';
+        else if (pathname.startsWith('/admin')) verifiedRole = 'ADMIN';
+        else verifiedRole = 'PATIENT';
+      }
     }
   }
 

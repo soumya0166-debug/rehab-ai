@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
@@ -19,7 +19,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { CanonicalRole } from '@/types';
 import { SEED_PROFILES } from '@/lib/auth/auth-service';
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo');
@@ -180,5 +180,13 @@ export default function LoginPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-400 text-sm">Loading login terminal...</div>}>
+      <LoginFormContent />
+    </Suspense>
   );
 }
