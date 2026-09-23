@@ -38,6 +38,13 @@ import { TRANSLATIONS } from '@/lib/i18n/translations';
 export default function SessionStudioPage({ params }: { params: Promise<{ exerciseId: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
+
+  useEffect(() => {
+    if (['elbow-flexion', 'shoulder-raise', 'sit-to-stand'].includes(resolvedParams.exerciseId)) {
+      router.replace(`/patient/exercise/${resolvedParams.exerciseId}`);
+    }
+  }, [resolvedParams.exerciseId, router]);
+
   const exercise = getExerciseById(resolvedParams.exerciseId);
 
   // Video & Canvas references

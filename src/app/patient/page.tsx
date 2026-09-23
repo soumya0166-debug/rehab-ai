@@ -84,7 +84,7 @@ export default function PatientDashboardPage() {
 
           <div className="flex items-center gap-2">
             <Link
-              href="/patient/session/knee-extension"
+              href="/patient/exercises"
               className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-cyan-900/40 hover:from-cyan-400 hover:to-blue-500 transition-all transform hover:-translate-y-0.5"
             >
               <Play className="h-3.5 w-3.5 fill-current" />
