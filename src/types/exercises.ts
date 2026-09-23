@@ -157,3 +157,43 @@ export interface DbPatientFeedback {
   patient_comment?: string | null;
   created_at: string;
 }
+
+// -------------------------------------------------------------
+// Live Session & Real-Time Analysis Types
+// -------------------------------------------------------------
+
+export type RepetitionPhase =
+  | 'REST'
+  | 'MOVING'
+  | 'TARGET_REACHED'
+  | 'RETURNING'
+  | 'COMPLETED_REP'
+  | 'INCOMPLETE_REP';
+
+export interface RepetitionResult {
+  repetitionNumber: number;
+  status: 'completed' | 'incomplete';
+  measuredRange: number;
+  targetRange: {
+    min: number;
+    max: number;
+  };
+  duration: number; // in seconds
+  feedback: string[];
+  timestamp: number;
+}
+
+/**
+ * 10 Canonical Clinical States for Patient Live Session
+ */
+export type LiveSessionState =
+  | 'preparation'           // 1. Instructions and requirements review
+  | 'camera_setup'          // 2. Camera feed check, positioning & lighting
+  | 'ready'                 // 3. Landmarks recognized, stability verified
+  | 'countdown'             // 4. 3-2-1 acoustic/visual start countdown
+  | 'active_session'        // 5. In-flight biomechanical tracking & repetition counting
+  | 'paused'                // 6. User or clinician paused session
+  | 'tracking_unavailable'  // 7. Poor lighting, occlusion, patient stepped out of frame
+  | 'pain_reported'         // 8. Patient flagged discomfort or pain threshold reached
+  | 'session_completed'     // 9. Prescribed repetitions fulfilled or completed normally
+  | 'technical_failure';    // 10. WebGL, camera hardware disconnect, or browser crash
