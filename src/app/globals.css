@@ -1,109 +1,200 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #00685f;
+  --color-primary-container: #008378;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #f4fffc;
+  --color-primary-fixed: #89f5e7;
+  --color-primary-fixed-dim: #6bd8cb;
+  --color-on-primary-fixed-variant: #005049;
+
+  --color-background: #f8f9ff;
+  --color-surface: #f8f9ff;
+  --color-surface-bright: #f8f9ff;
+  --color-surface-dim: #cbdbf5;
+  --color-surface-variant: #d3e4fe;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-container: #e5eeff;
+  --color-surface-container-high: #dce9ff;
+  --color-surface-container-highest: #d3e4fe;
+  --color-surface-tint: #006a61;
+
+  --color-on-background: #0b1c30;
+  --color-on-surface: #0b1c30;
+  --color-on-surface-variant: #3d4947;
+  --color-inverse-surface: #213145;
+  --color-inverse-on-surface: #eaf1ff;
+  --color-inverse-primary: #6bd8cb;
+
+  --color-secondary: #565e74;
+  --color-secondary-container: #dae2fd;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #5c647a;
+  --color-secondary-fixed: #dae2fd;
+  --color-secondary-fixed-dim: #bec6e0;
+  --color-on-secondary-fixed: #131b2e;
+  --color-on-secondary-fixed-variant: #3f465c;
+
+  --color-tertiary: #006947;
+  --color-tertiary-container: #00855b;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #f5fff6;
+  --color-tertiary-fixed: #6ffbbe;
+  --color-tertiary-fixed-dim: #4edea3;
+  --color-on-tertiary-fixed: #002113;
+  --color-on-tertiary-fixed-variant: #005236;
+
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  --color-outline: #6d7a77;
+  --color-outline-variant: #bcc9c6;
+
+  --font-headline: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+}
+
 @layer base {
   :root {
-    --bg-main: #090d16;
-    --card-surface: #0f172a;
-    --card-border: #1e293b;
-    --cyan-glow: #06b6d4;
-    --emerald-success: #10b981;
-    --rose-alert: #f43f5e;
+    --bg-main: #f8f9ff;
+    --card-surface: #ffffff;
+    --card-border: #dce9ff;
+    --cyan-glow: #00685f;
+    --emerald-success: #00855b;
+    --rose-alert: #ba1a1a;
     --amber-warning: #f59e0b;
+  }
+
+  html, body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    overscroll-behavior-y: none;
+    background-color: #f8f9ff;
+    color: #0b1c30;
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 }
 
-body {
-  background-color: #080c14;
-  color: #f1f5f9;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  overflow-x: hidden;
+/* Material Symbols Outlined Icon styling */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbars */
+/* Typography Utility Classes matching Stitch System */
+.font-headline-lg-mobile {
+  font-family: var(--font-headline);
+  font-size: 26px;
+  line-height: 34px;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+}
+
+.font-headline-sm {
+  font-family: var(--font-headline);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+.font-title-md {
+  font-family: var(--font-headline);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.font-label-sm {
+  font-family: var(--font-body);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.font-label-md {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+}
+
+.font-body-sm {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.font-body-md {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+
+.font-telemetry-numeral {
+  font-family: var(--font-headline);
+  font-size: 32px;
+  line-height: 36px;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+
+/* Custom subtle scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #eff4ff;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #bcc9c6;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #6d7a77;
 }
 
-/* Glowing HUD effects */
-.hud-glow-cyan {
-  box-shadow: 0 0 20px -3px rgba(6, 182, 212, 0.35);
-}
-
-.hud-glow-emerald {
-  box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.4);
-}
-
-.hud-glow-rose {
-  box-shadow: 0 0 20px -3px rgba(244, 63, 94, 0.45);
-}
-
-/* Glassmorphism surfaces */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(51, 65, 85, 0.5);
-}
-
-.glass-panel-subtle {
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(51, 65, 85, 0.3);
-}
-
-/* Target zone indicator pulse */
-@keyframes ringPulse {
-  0% {
-    transform: scale(0.96);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.04);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0.96);
-    opacity: 0.8;
-  }
-}
-
-.animate-pulse-slow {
-  animation: ringPulse 2.4s ease-in-out infinite;
-}
-
-/* Accessible focus outlines for keyboard navigation (WCAG 2.1 AA) */
+/* Accessible focus visible outlines */
 :focus-visible {
-  outline: 2px solid #06b6d4;
+  outline: 2px solid #00685f;
   outline-offset: 2px;
 }
 
-/* Reduced-motion support for accessibility & vestibular sensitivity */
+/* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, ::before, ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-
-  .animate-pulse,
-  .animate-pulse-slow,
-  .animate-spin,
-  .animate-bounce {
-    animation: none !important;
-  }
 }
-

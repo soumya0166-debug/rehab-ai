@@ -3,27 +3,6 @@
 import React, { useEffect, useRef, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { 
-  Camera, 
-  CameraOff, 
-  Volume2, 
-  VolumeX, 
-  Pause, 
-  Play, 
-  RotateCcw, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Info, 
-  ArrowLeft, 
-  Sparkles, 
-  Sliders, 
-  Activity, 
-  Save,
-  Check,
-  Globe,
-  Mic,
-  MicOff
-} from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getExerciseById } from '@/lib/biomechanics/exercises';
 import { ExerciseStateMachine } from '@/lib/biomechanics/stateMachine';
@@ -39,12 +18,6 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
   const resolvedParams = use(params);
   const router = useRouter();
 
-  useEffect(() => {
-    if (['elbow-flexion', 'shoulder-raise', 'sit-to-stand'].includes(resolvedParams.exerciseId)) {
-      router.replace(`/patient/exercise/${resolvedParams.exerciseId}`);
-    }
-  }, [resolvedParams.exerciseId, router]);
-
   const exercise = getExerciseById(resolvedParams.exerciseId);
 
   // Video & Canvas references
@@ -57,7 +30,6 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
   // Studio UI states
   const [repCount, setRepCount] = useState(0);
   const [currentAngle, setCurrentAngle] = useState(exercise.startAngle);
-  const [peakAngleInRep, setPeakAngleInRep] = useState(exercise.startAngle);
   const [repState, setRepState] = useState<RepState>('CALIBRATING');
   const [holdRemainingSeconds, setHoldRemainingSeconds] = useState(exercise.holdDurationSeconds);
   const [holdProgressRatio, setHoldProgressRatio] = useState(0);
@@ -67,13 +39,17 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
   const [currentLang, setCurrentLang] = useState<LanguageCode>('en');
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [soundEffectsEnabled, setSoundEffectsEnabled] = useState(true);
-  const [voiceCommandsActive, setVoiceCommandsActive] = useState(false);
-  const [lastVoiceCommand, setLastVoiceCommand] = useState<string | null>(null);
 
   // Studio modes
   const [activeAlert, setActiveAlert] = useState<{ message: string; severity: string } | null>(null);
   const [isSyntheticMode, setIsSyntheticMode] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+
+  // View mode switcher: 'split' | 'patient' | 'coach'
+  const [viewMode, setViewMode] = useState<'split' | 'patient' | 'coach'>('split');
+
+  // Active feedback card selection
+  const [feedbackState, setFeedbackState] = useState<'optimal' | 'velocity' | 'frame'>('optimal');
 
   // Summary Dialog Modal states
   const [sessionCompleted, setSessionCompleted] = useState(false);
@@ -95,36 +71,53 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
         if (newState === 'HOLDING_PEAK') {
           speechCoach.speak(t.cues.holding);
           speechCoach.playHoldTickTone();
+          setFeedbackState('optimal');
         } else if (newState === 'RETURNING') {
           speechCoach.speak(t.cues.returnDescend);
         } else if (newState === 'START_POSITION') {
-          setActiveAlert(null);
+          speechCoach.speak(t.cues.ready);
         }
+      },
+      onAngleTick: (data) => {
+        setCurrentAngle(Math.round(data.currentAngle));
+        setHoldRemainingSeconds(data.holdRemainingSeconds);
+        setHoldProgressRatio(data.holdProgressRatio);
       },
       onRepCompleted: (telemetry) => {
         setCompletedRepsTelemetry((prev) => [...prev, telemetry]);
-        speechCoach.playRepSuccessTone();
-        speechCoach.speak(`${t.cues.repDone} (${telemetry.repNumber})`);
+        setRepCount((prev) => prev + 1);
 
-        if (telemetry.repNumber >= exercise.recommendedReps) {
-          triggerSessionCompletion();
+        speechCoach.speak(t.cues.repDone);
+        speechCoach.playRepSuccessTone();
+
+        if (telemetry.compensationsDetected.length > 0) {
+          setFeedbackState('velocity');
+        } else {
+          setFeedbackState('optimal');
+        }
+
+        try {
+          confetti({
+            particleCount: 25,
+            spread: 45,
+            origin: { y: 0.8 },
+            colors: ['#00685f', '#14B8A6', '#6ffbbe'],
+          });
+        } catch {
+          // ignore
         }
       },
       onCompensationAlert: (warning, voiceCue, severity) => {
         setActiveAlert({ message: warning, severity });
         speechCoach.playAlertTone();
-        speechCoach.speak(voiceCue);
-      },
-      onAngleTick: (data) => {
-        setCurrentAngle(data.currentAngle);
-        setPeakAngleInRep(data.peakAngle);
-        setHoldRemainingSeconds(data.holdRemainingSeconds);
-        setHoldProgressRatio(data.holdProgressRatio);
+        if (voiceCue) {
+          speechCoach.speak(voiceCue);
+          setFeedbackState('velocity');
+        }
       },
     });
 
     stateMachineRef.current = sm;
-
     startCameraOrSynthetic(false);
 
     return () => {
@@ -137,7 +130,6 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercise, currentLang]);
 
-  // Sync voice settings & language
   useEffect(() => {
     speechCoach.setMuted(!voiceEnabled);
     speechCoach.setLanguage(currentLang);
@@ -147,35 +139,10 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
     speechCoach.setSoundEffectsMuted(!soundEffectsEnabled);
   }, [soundEffectsEnabled]);
 
-  // Handle Hands-Free Voice Commands
-  const toggleVoiceCommands = () => {
-    if (voiceCommandsActive) {
-      voiceRecognition.stopListening();
-      setVoiceCommandsActive(false);
-      setLastVoiceCommand(null);
-    } else {
-      voiceRecognition.setLanguage(currentLang);
-      voiceRecognition.startListening((command) => {
-        setLastVoiceCommand(command);
-        if (command === 'pause') {
-          setIsPaused(true);
-          speechCoach.speak('Workout paused');
-        } else if (command === 'resume') {
-          setIsPaused(false);
-          speechCoach.speak('Resuming workout');
-        } else if (command === 'finish') {
-          triggerSessionCompletion();
-        } else if (command === 'status') {
-          speechCoach.speak(`You have completed ${repCount} of ${exercise.recommendedReps} repetitions.`);
-        }
-      });
-      setVoiceCommandsActive(true);
-    }
-  };
-
   const startCameraOrSynthetic = async (forceSynthetic: boolean) => {
     if (!canvasRef.current) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onLandmarks = (landmarks: any[]) => {
       if (!canvasRef.current || isPaused) return;
 
@@ -221,12 +188,12 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
   const triggerSessionCompletion = () => {
     setSessionCompleted(true);
     poseManager.stop();
-    voiceRecognition.stopListening();
     try {
       confetti({
         particleCount: 80,
         spread: 70,
         origin: { y: 0.6 },
+        colors: ['#00685f', '#14B8A6', '#6ffbbe'],
       });
     } catch {
       // ignore
@@ -236,7 +203,7 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
   const handleSaveSession = () => {
     setIsSaving(true);
     const patients = getPatients();
-    const primaryPatient = patients[0] || { id: 'pt-001', name: 'Sarah Connor' };
+    const primaryPatient = patients[0] || { id: 'pt-001', name: 'Rahul Sharma' };
 
     const totalReps = completedRepsTelemetry.length;
     const cleanReps = completedRepsTelemetry.filter((r) => r.passed && r.compensationsDetected.length === 0).length;
@@ -251,7 +218,7 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
 
     const avgScore = totalReps > 0
       ? Math.round(completedRepsTelemetry.reduce((acc, r) => acc + r.score, 0) / totalReps)
-      : 90;
+      : 92;
 
     const compensationFreq: Record<string, number> = {};
     completedRepsTelemetry.forEach((r) => {
@@ -286,383 +253,448 @@ export default function SessionStudioPage({ params }: { params: Promise<{ exerci
 
     setTimeout(() => {
       setIsSaving(false);
-      router.push('/patient');
+      router.push('/patient/progress');
     }, 600);
   };
 
-  // State display helper
-  const getStateBadge = () => {
-    const text = t.states[repState] || repState;
-    switch (repState) {
-      case 'CALIBRATING':
-        return { label: text, color: 'bg-slate-800 text-slate-300 border-slate-700' };
-      case 'START_POSITION':
-        return { label: text, color: 'bg-cyan-950/80 text-cyan-300 border-cyan-800' };
-      case 'IN_MOTION':
-        return { label: text, color: 'bg-blue-950/80 text-blue-300 border-blue-800' };
-      case 'HOLDING_PEAK':
-        return { label: `${text} (${holdRemainingSeconds.toFixed(1)}s)`, color: 'bg-emerald-950/90 text-emerald-300 border-emerald-700 animate-pulse' };
-      case 'RETURNING':
-        return { label: text, color: 'bg-indigo-950/80 text-indigo-300 border-indigo-800' };
-      default:
-        return { label: text, color: 'bg-slate-800 text-slate-400 border-slate-700' };
-    }
-  };
-
-  const badge = getStateBadge();
+  const progressPercent = Math.min(100, Math.round((repCount / exercise.recommendedReps) * 100));
 
   return (
-    <div className="relative min-h-[calc(100vh-61px)] bg-[#070b12] text-slate-100 flex flex-col">
-      
-      {/* Top Session Control Bar */}
-      <div className="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/patient"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div>
-            <h1 className="text-sm font-bold text-white flex items-center gap-2">
-              {exercise.name}
-              <span className="text-[11px] font-mono text-cyan-400 font-normal">
-                ({exercise.targetAngleMin}° target)
-              </span>
-            </h1>
-            <p className="text-[11px] text-slate-400">
-              Prescription: {exercise.recommendedReps} Reps · {exercise.holdDurationSeconds}s Peak Hold
-            </p>
-          </div>
-        </div>
-
-        {/* HUD Controls */}
-        <div className="flex items-center gap-2">
-          
-          {/* Language Selector */}
-          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs">
-            <Globe className="h-3.5 w-3.5 text-cyan-400" />
-            <select
-              value={currentLang}
-              onChange={(e) => setCurrentLang(e.target.value as LanguageCode)}
-              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer"
-            >
-              <option value="en" className="bg-slate-900">English</option>
-              <option value="es" className="bg-slate-900">Español</option>
-              <option value="fr" className="bg-slate-900">Français</option>
-              <option value="de" className="bg-slate-900">Deutsch</option>
-              <option value="hi" className="bg-slate-900">हिन्दी</option>
-            </select>
-          </div>
-
-          {/* Hands-Free Voice Commands Mic Toggle */}
-          <button
-            onClick={toggleVoiceCommands}
-            className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium border transition-colors ${
-              voiceCommandsActive
-                ? 'border-emerald-500/60 bg-emerald-950/50 text-emerald-300'
-                : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200'
-            }`}
-            title="Hands-free voice recognition: Say 'Pause', 'Resume', 'Finish', 'Status'"
-          >
-            {voiceCommandsActive ? <Mic className="h-3.5 w-3.5 text-emerald-400 animate-pulse" /> : <MicOff className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{voiceCommandsActive ? 'Voice Cues Active' : 'Hands-Free'}</span>
-          </button>
-
-          {/* Synthetic Simulator Toggle */}
-          <button
-            onClick={toggleSynthetic}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium border transition-colors ${
-              isSyntheticMode
-                ? 'border-amber-500/50 bg-amber-950/40 text-amber-300'
-                : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200'
-            }`}
-            title="Toggle between Live Camera and Synthetic Biomechanical Simulator"
-          >
-            {isSyntheticMode ? <Sliders className="h-3.5 w-3.5 text-amber-400" /> : <Camera className="h-3.5 w-3.5 text-cyan-400" />}
-            <span>{isSyntheticMode ? 'Simulation' : 'Camera'}</span>
-          </button>
-
-          {/* Voice Coach Sound Toggle */}
-          <button
-            onClick={() => setVoiceEnabled(!voiceEnabled)}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
-              voiceEnabled
-                ? 'border-cyan-800/80 bg-cyan-950/40 text-cyan-400'
-                : 'border-slate-800 bg-slate-900 text-slate-500'
-            }`}
-            title="Toggle Spoken Coaching"
-          >
-            {voiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-          </button>
-
-          {/* Finish Early Button */}
-          <button
-            onClick={triggerSessionCompletion}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t.ui.finishSession}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Hands-free Voice Command Banner */}
-      {voiceCommandsActive && (
-        <div className="bg-emerald-950/60 border-b border-emerald-900/40 px-4 py-1.5 text-center text-xs text-emerald-300 flex items-center justify-center gap-2">
-          <Mic className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
-          <span>Hands-free voice recognition active. Say: <strong>"Pause"</strong>, <strong>"Resume"</strong>, <strong>"Status"</strong>, or <strong>"Finish"</strong></span>
-          {lastVoiceCommand && (
-            <span className="bg-emerald-900/80 text-white font-mono px-2 py-0.5 rounded text-[11px] font-bold">
-              Detected: "{lastVoiceCommand}"
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Main Studio Viewport */}
-      <div className="flex-1 relative flex flex-col items-center justify-center p-3 sm:p-6 overflow-hidden">
+    <div className="flex-1 flex flex-col relative w-full pt-4 pb-28 bg-[#f8f9ff] min-h-screen text-[#0b1c30]">
+      <div className="flex flex-col w-full max-w-4xl mx-auto px-4 sm:px-6 gap-4">
         
-        {/* Active Alert Banner Overlay */}
-        {activeAlert && (
-          <div className="absolute top-6 z-30 flex items-center gap-2.5 rounded-xl border border-rose-500/50 bg-rose-950/90 px-4 py-2.5 text-xs font-semibold text-rose-200 shadow-xl backdrop-blur-md animate-bounce">
-            <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
-            <span>{activeAlert.message}</span>
+        {/* Hidden Camera Element */}
+        <video ref={videoRef} className="hidden" playsInline muted />
+
+        {/* 1. Top Session Bar HUD */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-[#dce9ff] flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex w-3 h-3 rounded-full bg-[#00685f] animate-pulse"></span>
+              <span className="font-headline text-lg sm:text-xl font-bold text-[#0b1c30]">{exercise.name}</span>
+            </div>
+            <div className="bg-[#eff4ff] px-3 py-1 rounded-full text-[#565e74] font-label-md text-xs font-semibold border border-[#dce9ff]">
+              Repetition <span className="text-[#00685f] font-bold">{repCount}</span> of {exercise.recommendedReps}
+            </div>
           </div>
-        )}
+          {/* Rep Progress Bar */}
+          <div className="w-full bg-[#eff4ff] h-2 rounded-full overflow-hidden mt-1">
+            <div
+              className="bg-[#00685f] h-full rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progressPercent}%` }}
+            ></div>
+          </div>
+        </div>
 
-        {/* Video Canvas Container */}
-        <div className="relative w-full max-w-4xl aspect-[4/3] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl flex items-center justify-center">
-          
-          {/* Hidden/Muted Video Feed */}
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            className={`absolute inset-0 w-full h-full object-cover -scale-x-100 ${
-              isSyntheticMode ? 'opacity-0 pointer-events-none' : 'opacity-85'
-            }`}
-          />
-
-          {/* Synthetic Mode Dark Background with Motion Grid */}
-          {isSyntheticMode && (
-            <div className="absolute inset-0 bg-[#090e17] flex items-center justify-center">
-              <div 
-                className="absolute inset-0 opacity-15"
-                style={{
-                  backgroundImage: 'radial-gradient(#06b6d4 1px, transparent 1px)',
-                  backgroundSize: '24px 24px'
-                }}
-              />
-              <div className="absolute top-4 left-4 flex items-center gap-1.5 rounded-md bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-[11px] text-amber-300 font-mono">
-                <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
-                Synthetic Biomechanical Stream Active
-              </div>
-            </div>
-          )}
-
-          {/* High-Contrast Clinical Skeleton HUD Canvas */}
-          <canvas
-            ref={canvasRef}
-            width={640}
-            height={480}
-            className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none"
-          />
-
-          {/* Bottom Video HUD Overlay */}
-          <div className="absolute bottom-4 left-4 right-4 z-20 flex flex-wrap items-end justify-between gap-3 pointer-events-auto">
-            
-            {/* Rep Counter Card */}
-            <div className="rounded-xl border border-slate-800/80 bg-slate-900/90 backdrop-blur-md p-3 shadow-lg min-w-[130px]">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.ui.repCount}</div>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-3xl font-extrabold text-white font-mono">{repCount}</span>
-                <span className="text-xs text-slate-400 font-mono">/ {exercise.recommendedReps}</span>
-              </div>
-              <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                <div 
-                  className="bg-cyan-500 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, (repCount / exercise.recommendedReps) * 100)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Rep State Badge */}
-            <div className={`rounded-xl border px-4 py-2 text-xs font-semibold shadow-lg backdrop-blur-md ${badge.color}`}>
-              {badge.label}
-            </div>
-
-            {/* Angle Gauge Card */}
-            <div className="rounded-xl border border-slate-800/80 bg-slate-900/90 backdrop-blur-md p-3 shadow-lg min-w-[140px] text-right">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.ui.jointAngle}</div>
-              <div className="flex items-baseline justify-end gap-1 mt-0.5">
-                <span className={`text-3xl font-extrabold font-mono ${
-                  repState === 'HOLDING_PEAK' ? 'text-emerald-400' : 'text-cyan-400'
-                }`}>
-                  {currentAngle}°
+        {/* 2. Real-Time Biometric Telemetry Strip */}
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+          {/* Active Angle Dial */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-[#dce9ff] flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[10px] text-[#565e74] uppercase font-bold">Flexion Angle</span>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="font-headline text-2xl sm:text-3xl font-bold text-[#00685f]">{currentAngle}°</span>
+                <span className="font-label-sm text-[11px] text-[#006947] font-semibold">
+                  {currentAngle >= exercise.targetAngleMin && currentAngle <= exercise.targetAngleMax ? 'Optimal' : 'Active'}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-400 mt-1">
-                {t.ui.target}: <span className="text-slate-200 font-medium">{exercise.targetAngleMin}°</span>
-              </div>
             </div>
-
+            <div className="w-11 h-11 rounded-full bg-[#eff4ff] flex items-center justify-center relative border border-[#dce9ff]">
+              <svg className="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
+                <circle className="text-[#d3e4fe] stroke-current" cx="18" cy="18" fill="none" r="14" strokeWidth="3" />
+                <circle
+                  className="text-[#00685f] stroke-current"
+                  cx="18"
+                  cy="18"
+                  fill="none"
+                  r="14"
+                  strokeDasharray="88"
+                  strokeDashoffset={Math.max(0, 88 - (currentAngle / 180) * 88)}
+                  strokeLinecap="round"
+                  strokeWidth="3"
+                />
+              </svg>
+              <span className="material-symbols-outlined text-[18px] text-[#00685f] absolute">show_chart</span>
+            </div>
           </div>
 
-          {/* Peak Hold Timer Bar */}
-          {repState === 'HOLDING_PEAK' && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 w-64 rounded-xl border border-emerald-500/40 bg-slate-950/90 backdrop-blur-md p-2.5 shadow-xl">
-              <div className="flex justify-between items-center text-xs mb-1 font-semibold">
-                <span className="text-emerald-400">{t.ui.holdPeak}</span>
-                <span className="text-white font-mono">{holdRemainingSeconds.toFixed(1)}s</span>
-              </div>
-              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div 
-                  className="bg-emerald-400 h-full rounded-full transition-all duration-100"
-                  style={{ width: `${Math.min(100, holdProgressRatio * 100)}%` }}
-                />
+          {/* Target Window */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-[#dce9ff] flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[10px] text-[#565e74] uppercase font-bold">Target Corridor</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="font-headline text-xl sm:text-2xl font-bold text-[#0b1c30]">
+                  {exercise.targetAngleMin}°–{exercise.targetAngleMax}°
+                </span>
               </div>
             </div>
-          )}
-
-        </div>
-
-        {/* Setup Instructions Strip */}
-        <div className="w-full max-w-4xl mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-          {exercise.setupInstructions.map((step, idx) => (
-            <div key={idx} className="flex items-start gap-2 rounded-lg border border-slate-800/70 bg-slate-900/40 p-2.5 text-slate-300">
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-cyan-400">
-                {idx + 1}
+            <div className="bg-[#dae2fd] text-[#5c647a] px-2.5 py-1 rounded-xl flex items-center gap-1 border border-[#dce9ff]">
+              <span className="material-symbols-outlined text-[16px] text-[#00685f]">verified</span>
+              <span className="font-label-sm text-[11px] font-bold">
+                {currentAngle >= exercise.targetAngleMin ? 'Matched' : 'In Reach'}
               </span>
-              <p className="leading-snug">{step}</p>
             </div>
-          ))}
+          </div>
+
+          {/* CV Tracking Quality */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-[#dce9ff] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full bg-[#eff4ff] flex items-center justify-center text-[#00685f] border border-[#dce9ff]">
+                <span className="material-symbols-outlined text-[18px]">videocam</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-label-sm text-[10px] text-[#565e74]">CV Quality</span>
+                <span className="font-label-md text-xs font-bold text-[#0b1c30]">94% Confidence</span>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 font-label-sm text-[11px] text-[#006947] font-semibold">
+              <span className="w-2 h-2 rounded-full bg-[#00855b]"></span> 30 FPS
+            </span>
+          </div>
+
+          {/* Dynamic Tempo Pace */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-[#dce9ff] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full bg-[#eff4ff] flex items-center justify-center text-[#00685f] border border-[#dce9ff]">
+                <span className="material-symbols-outlined text-[18px]">speed</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-label-sm text-[10px] text-[#565e74]">Kinetic Tempo</span>
+                <span className="font-label-md text-xs font-bold text-[#0b1c30]">Controlled (2.4s)</span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-[20px] text-[#00685f]">check_circle</span>
+          </div>
         </div>
 
-      </div>
+        {/* 3. Synchronized Split-Screen Rehabilitation View */}
+        <div className="flex flex-col gap-3">
+          {/* View Mode Switcher */}
+          <div className="bg-[#eff4ff] p-1 rounded-2xl flex items-center text-center border border-[#dce9ff]">
+            <button
+              onClick={() => setViewMode('split')}
+              className={`flex-1 py-2 rounded-xl font-label-md text-xs font-bold transition-all ${
+                viewMode === 'split' ? 'bg-white shadow-sm text-[#00685f]' : 'text-[#565e74] hover:text-[#0b1c30]'
+              }`}
+            >
+              Synchronized Mirror
+            </button>
+            <button
+              onClick={() => setViewMode('patient')}
+              className={`flex-1 py-2 rounded-xl font-label-md text-xs font-bold transition-all ${
+                viewMode === 'patient' ? 'bg-white shadow-sm text-[#00685f]' : 'text-[#565e74] hover:text-[#0b1c30]'
+              }`}
+            >
+              Pose Telemetry
+            </button>
+            <button
+              onClick={() => setViewMode('coach')}
+              className={`flex-1 py-2 rounded-xl font-label-md text-xs font-bold transition-all ${
+                viewMode === 'coach' ? 'bg-white shadow-sm text-[#00685f]' : 'text-[#565e74] hover:text-[#0b1c30]'
+              }`}
+            >
+              Coach Priya
+            </button>
+          </div>
 
-      {/* Post-Workout Completion Modal */}
-      {sessionCompleted && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-6">
-            
-            <div className="text-center space-y-2">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-lg shadow-emerald-900/50">
-                <Check className="h-8 w-8 stroke-[3]" />
+          {/* Primary Interaction Canvas: Dual Visual Stack */}
+          <div className="relative w-full aspect-[4/3] rounded-3xl overflow-hidden bg-[#213145] shadow-lg border border-[#dce9ff]">
+            {/* AI Digital Assistant (Priya) Frame */}
+            {(viewMode === 'split' || viewMode === 'coach') && (
+              <div className="absolute inset-0 w-full h-full">
+                <img
+                  className="w-full h-full object-cover object-top"
+                  alt="Coach Priya Active Demonstration"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKmR4TbUjG0_2kp_iUFjj5pT5AJeBVnx-awTwmRn3PDeVgs9JjhAJ8cJvO0udBwuG_SU30JLursdriDfp67DeJrjC-ao088qXKQ-TOy51rxCnHAenTF_u_HUeEhz748eBd3MD2AvYQzWxxMyPuq2xs3GbFu6vY5MRBCckPBGvQfWa07-qAdAAl_NIMun6cBegxdL4yVwEObBGG7_jvNyPaK9RwzXfWrqaoMDqOEkIvmQjFOa6dcIBQcQ"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#213145]/90 via-transparent to-black/30"></div>
+                <div className="absolute top-3 left-3 bg-[#213145]/80 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-2 border border-white/10">
+                  <span className="w-2 h-2 rounded-full bg-[#89f5e7] animate-ping"></span>
+                  <span className="font-label-sm text-[11px] text-white">AI Coach Priya: Active Sync</span>
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-white">{t.states.REP_COMPLETED}</h2>
-              <p className="text-xs text-slate-400">
-                Telemetry recorded with {completedRepsTelemetry.length} total reps for {exercise.name}.
+            )}
+
+            {/* Live Patient Computer Vision Skeletal Overlay */}
+            {(viewMode === 'split' || viewMode === 'patient') && (
+              <div
+                className={`overflow-hidden transition-all ${
+                  viewMode === 'patient'
+                    ? 'absolute inset-0 w-full h-full bg-[#213145] z-10'
+                    : 'absolute bottom-3 right-3 w-40 sm:w-48 h-52 sm:h-60 rounded-2xl shadow-2xl bg-[#213145]/90 backdrop-blur-md border border-white/20 z-10'
+                }`}
+              >
+                <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                  <canvas
+                    ref={canvasRef}
+                    width={480}
+                    height={360}
+                    className="w-full h-full object-cover"
+                  />
+
+                  {/* Dynamic Angle Chip Inside PiP */}
+                  <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/70 px-2 py-0.5 rounded-full text-[10px] text-white font-label-sm border border-white/10">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#6ffbbe]"></span> You ({currentAngle}°)
+                  </div>
+
+                  {isSyntheticMode && (
+                    <div className="absolute bottom-2 right-2 bg-[#00685f]/90 text-white px-2 py-0.5 rounded text-[9px] font-bold">
+                      Synthetic Pose Active
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Real-time Conversational Voice Feed Pill */}
+            <div className="absolute bottom-3 left-3 max-w-[62%] sm:max-w-[55%] bg-white/95 backdrop-blur-md p-3 rounded-2xl shadow-lg border border-[#dce9ff] flex flex-col gap-1 z-20">
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full bg-[#00685f] flex items-center justify-center text-white">
+                  <span className="material-symbols-outlined text-[13px]">graphic_eq</span>
+                </div>
+                <span className="font-headline text-xs text-[#00685f] font-bold">Coach Priya</span>
+                {/* Voice wave visualizer */}
+                <span className="flex items-center gap-0.5 ml-auto">
+                  <span className="w-0.5 h-2 bg-[#00685f] rounded-full animate-bounce"></span>
+                  <span className="w-0.5 h-3.5 bg-[#00685f] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></span>
+                  <span className="w-0.5 h-2 bg-[#00685f] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                </span>
+              </div>
+              <p className="font-body text-xs sm:text-sm text-[#0b1c30] leading-tight font-medium">
+                {activeAlert
+                  ? activeAlert.message
+                  : currentAngle >= exercise.targetAngleMin
+                  ? "Good movement. Hold peak for a moment, then lower slowly."
+                  : "Raise smoothly into the target corridor."}
               </p>
             </div>
+          </div>
+        </div>
 
-            {/* Performance Metrics Summary */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-center">
-                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{t.ui.formScore}</div>
-                <div className="text-2xl font-bold text-cyan-400 mt-0.5">
-                  {completedRepsTelemetry.length > 0
-                    ? Math.round(completedRepsTelemetry.reduce((acc, r) => acc + r.score, 0) / completedRepsTelemetry.length)
-                    : 92}
-                  <span className="text-xs text-slate-400 font-normal">/100</span>
-                </div>
+        {/* 4. Adaptive Live Feedback State Switcher Carousel */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="font-label-sm text-[11px] text-[#565e74] uppercase tracking-wider font-bold">
+              Active Feedback Stream
+            </span>
+            <span className="font-label-sm text-xs text-[#00685f] font-semibold flex items-center gap-1">
+              <span className="material-symbols-outlined text-[15px]">subtitles</span> Live Subtitles
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            {/* Target In-Zone State */}
+            <div
+              onClick={() => setFeedbackState('optimal')}
+              className={`p-3.5 rounded-2xl flex items-start gap-3 transition-all cursor-pointer border ${
+                feedbackState === 'optimal'
+                  ? 'bg-[#00855b]/10 border-[#00855b]/30'
+                  : 'bg-white border-[#dce9ff] opacity-60'
+              }`}
+            >
+              <div className="w-8 h-8 rounded-full bg-[#006947] flex items-center justify-center text-white shrink-0 mt-0.5">
+                <span className="material-symbols-outlined text-[18px]">thumb_up</span>
               </div>
-
-              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-center">
-                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Peak ROM</div>
-                <div className="text-2xl font-bold text-emerald-400 mt-0.5 font-mono">
-                  {completedRepsTelemetry.length > 0
-                    ? Math.max(...completedRepsTelemetry.map((r) => r.peakAngle))
-                    : exercise.targetAngleMin}°
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-headline text-xs sm:text-sm text-[#006947] font-bold">Optimal Execution</span>
+                  <span className="font-label-sm text-[10px] text-[#006947] bg-[#00855b]/20 px-2 py-0.5 rounded-full font-bold">
+                    Target Corridor
+                  </span>
                 </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-center">
-                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Clean Reps</div>
-                <div className="text-2xl font-bold text-white mt-0.5 font-mono">
-                  {completedRepsTelemetry.filter((r) => r.passed && r.compensationsDetected.length === 0).length}
-                  <span className="text-xs text-slate-400 font-normal">/{completedRepsTelemetry.length || exercise.recommendedReps}</span>
-                </div>
+                <p className="font-body text-xs sm:text-sm text-[#0b1c30] mt-0.5">
+                  &quot;Good. That&apos;s a controlled movement. Hold for one second at peak.&quot;
+                </p>
               </div>
             </div>
 
-            {/* Post-Session Clinical Questionnaire */}
-            <div className="space-y-4 pt-2 border-t border-slate-800 text-xs">
-              
-              {/* Pain Scale Slider (VAS 0-10) */}
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <span className="font-semibold text-slate-200">{t.ui.painRating}:</span>
-                  <span className={`font-bold font-mono px-2 py-0.5 rounded ${
-                    painRating <= 3 ? 'bg-emerald-950 text-emerald-300' : painRating <= 6 ? 'bg-amber-950 text-amber-300' : 'bg-rose-950 text-rose-300'
-                  }`}>
-                    {painRating} - {painRating <= 3 ? 'Mild' : painRating <= 6 ? 'Moderate' : 'Severe'}
+            {/* Outside Target State */}
+            <div
+              onClick={() => setFeedbackState('velocity')}
+              className={`p-3.5 rounded-2xl flex items-start gap-3 transition-all cursor-pointer border ${
+                feedbackState === 'velocity'
+                  ? 'bg-[#dae2fd]/40 border-[#565e74]/40'
+                  : 'bg-white border-[#dce9ff] opacity-60'
+              }`}
+            >
+              <div className="w-8 h-8 rounded-full bg-[#565e74] flex items-center justify-center text-white shrink-0 mt-0.5">
+                <span className="material-symbols-outlined text-[18px]">slow_motion_video</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-headline text-xs sm:text-sm text-[#565e74] font-bold">Velocity Prompt</span>
+                  <span className="font-label-sm text-[10px] text-[#565e74] bg-[#eff4ff] px-2 py-0.5 rounded-full font-bold">
+                    Pacing
                   </span>
                 </div>
+                <p className="font-body text-xs sm:text-sm text-[#565e74] mt-0.5">
+                  &quot;Let&apos;s try that movement a little more slowly. Lower back to start.&quot;
+                </p>
+              </div>
+            </div>
+
+            {/* Camera Tracking Guidance */}
+            <div
+              onClick={() => setFeedbackState('frame')}
+              className={`p-3.5 rounded-2xl flex items-start gap-3 transition-all cursor-pointer border ${
+                feedbackState === 'frame'
+                  ? 'bg-[#eff4ff] border-[#00685f]/40'
+                  : 'bg-white border-[#dce9ff] opacity-60'
+              }`}
+            >
+              <div className="w-8 h-8 rounded-full bg-[#dce9ff] flex items-center justify-center text-[#565e74] shrink-0 mt-0.5">
+                <span className="material-symbols-outlined text-[18px]">crop_free</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-headline text-xs sm:text-sm text-[#565e74] font-bold">Frame Calibration</span>
+                  <span className="font-label-sm text-[10px] text-[#565e74] bg-[#eff4ff] px-2 py-0.5 rounded-full font-bold">
+                    Vision
+                  </span>
+                </div>
+                <p className="font-body text-xs sm:text-sm text-[#565e74] mt-0.5">
+                  &quot;Keep full body visible in camera frame for accurate joint tracking.&quot;
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 5. Clinical Safety & Bio-Assistance Card */}
+        <div className="bg-[#eff4ff] rounded-2xl p-4 flex items-center justify-between border border-[#dce9ff]">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-[#00685f] text-[22px]">health_and_safety</span>
+            <div className="flex flex-col">
+              <span className="font-headline text-xs sm:text-sm text-[#0b1c30] font-bold">Adaptive Load Guard</span>
+              <span className="font-label-sm text-[11px] text-[#565e74]">RPE threshold locked to Mild (Zone 2)</span>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setPainRating((p) => Math.min(10, p + 1));
+              speechCoach.speak("Pain flagged. We've logged this discomfort rating for Dr. Mehta.");
+            }}
+            className="bg-[#ffdad6] text-[#93000a] px-3.5 py-1.5 rounded-xl font-label-sm text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-transform border border-[#ffdad6]"
+          >
+            <span className="material-symbols-outlined text-[16px] text-[#ba1a1a]">report</span>
+            Report Discomfort ({painRating})
+          </button>
+        </div>
+
+        {/* 6. Primary Bottom Session Controls */}
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-3">
+            {/* Pause Session */}
+            <button
+              onClick={() => setIsPaused(!isPaused)}
+              className="bg-[#d3e4fe] hover:bg-[#cbdbf5] text-[#0b1c30] font-headline text-xs sm:text-sm font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 transition-colors border border-[#dce9ff]"
+            >
+              <span className="material-symbols-outlined text-[20px]">{isPaused ? 'play_arrow' : 'pause'}</span>
+              <span>{isPaused ? 'Resume Reps' : 'Pause Reps'}</span>
+            </button>
+
+            {/* Stop & Save Session */}
+            <button
+              onClick={triggerSessionCompletion}
+              className="bg-[#00685f] hover:bg-[#005049] text-white font-headline text-xs sm:text-sm font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-md transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">save</span>
+              <span>Stop &amp; Save</span>
+            </button>
+          </div>
+
+          {/* Quick Accessibility Bar */}
+          <div className="flex items-center justify-between px-2 pt-1 text-[#565e74] text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-[#00685f]">record_voice_over</span>
+              <span className="font-label-sm text-[11px]">Audio Engine: Neural Human Synthesizer</span>
+            </div>
+            <button
+              onClick={toggleSynthetic}
+              className="font-label-sm text-[11px] text-[#00685f] font-bold hover:underline"
+            >
+              {isSyntheticMode ? 'Switch to Camera' : 'Calibrate Sensor (Synthetic)'}
+            </button>
+          </div>
+        </div>
+
+        {/* 7. Save & Review Modal */}
+        {sessionCompleted && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-[#dce9ff] flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-[#eff4ff] pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#00685f] text-[24px]">task_alt</span>
+                  <h3 className="font-headline text-lg font-bold text-[#0b1c30]">Session Completed!</h3>
+                </div>
+                <span className="font-label-sm text-xs bg-[#eff4ff] text-[#00685f] px-2.5 py-1 rounded-full font-bold">
+                  {repCount} of {exercise.recommendedReps} Reps
+                </span>
+              </div>
+
+              {/* Discomfort VAS */}
+              <div className="flex flex-col gap-1.5">
+                <label className="font-headline text-xs font-bold text-[#0b1c30] flex justify-between">
+                  <span>Post-Session Discomfort</span>
+                  <span className="text-[#00685f] font-bold">{painRating} / 10 VAS</span>
+                </label>
                 <input
                   type="range"
                   min="0"
                   max="10"
                   value={painRating}
-                  onChange={(e) => setPainRating(parseInt(e.target.value))}
-                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                  onChange={(e) => setPainRating(Number(e.target.value))}
+                  className="w-full accent-[#00685f]"
                 />
               </div>
 
-              {/* RPE Effort (Borg Scale 1-10) */}
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <span className="font-semibold text-slate-200">{t.ui.effortRating}:</span>
-                  <span className="font-bold font-mono text-cyan-300">{effortRpe} / 10</span>
-                </div>
+              {/* Effort RPE */}
+              <div className="flex flex-col gap-1.5">
+                <label className="font-headline text-xs font-bold text-[#0b1c30] flex justify-between">
+                  <span>Exertion Effort</span>
+                  <span className="text-[#00685f] font-bold">{effortRpe} / 10 Borg</span>
+                </label>
                 <input
                   type="range"
                   min="1"
                   max="10"
                   value={effortRpe}
-                  onChange={(e) => setEffortRpe(parseInt(e.target.value))}
-                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                  onChange={(e) => setEffortRpe(Number(e.target.value))}
+                  className="w-full accent-[#00685f]"
                 />
               </div>
 
-              {/* Feedback text */}
-              <div>
-                <label className="block font-semibold text-slate-200 mb-1">
-                  Notes for Physiotherapist & Caregiver:
-                </label>
+              {/* Patient Note */}
+              <div className="flex flex-col gap-1.5">
+                <label className="font-headline text-xs font-bold text-[#0b1c30]">Optional Patient Comment</label>
                 <textarea
+                  rows={2}
+                  placeholder="Felt smooth today, no shoulder pinching."
                   value={patientFeedback}
                   onChange={(e) => setPatientFeedback(e.target.value)}
-                  placeholder="e.g. Felt steady during extension, no pain on hold."
-                  rows={2}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
+                  className="w-full p-3 rounded-xl bg-[#eff4ff] border border-[#dce9ff] text-xs text-[#0b1c30] placeholder:text-[#565e74] focus:outline-none"
                 />
               </div>
 
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setSessionCompleted(false)}
+                  className="flex-1 py-3 rounded-xl bg-[#eff4ff] text-[#565e74] font-headline text-xs font-bold hover:bg-[#dce9ff] transition-colors"
+                >
+                  Resume
+                </button>
+                <button
+                  onClick={handleSaveSession}
+                  disabled={isSaving}
+                  className="flex-1 py-3 rounded-xl bg-[#00685f] hover:bg-[#005049] text-white font-headline text-xs font-bold shadow-md transition-colors disabled:opacity-75"
+                >
+                  {isSaving ? 'Synchronizing...' : 'Save & Sync Record'}
+                </button>
+              </div>
             </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                onClick={() => setSessionCompleted(false)}
-                className="flex-1 rounded-xl border border-slate-700 bg-slate-800 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition-colors"
-              >
-                {t.ui.resume}
-              </button>
-              <button
-                onClick={handleSaveSession}
-                disabled={isSaving}
-                className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-2.5 text-xs font-semibold text-white shadow-lg shadow-cyan-900/40 hover:from-cyan-400 hover:to-blue-500 transition-all disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
-                {isSaving ? 'Syncing Telemetry...' : t.ui.saveSession}
-              </button>
-            </div>
-
           </div>
-        </div>
-      )}
-
+        )}
+      </div>
     </div>
   );
 }

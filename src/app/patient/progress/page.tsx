@@ -1,298 +1,385 @@
 'use client';
 
-import React from 'react';
-import {
-  TrendingUp,
-  Activity,
-  CheckCircle2,
-  Calendar,
-  Clock,
-  ShieldCheck,
-  AlertCircle,
-  HelpCircle,
-  Target,
-} from 'lucide-react';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ReferenceLine,
-} from 'recharts';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Alert } from '@/components/ui/alert';
+import React, { useState } from 'react';
+import confetti from 'canvas-confetti';
 
 export default function PatientProgressPage() {
-  // 1. Movement Performance Trend Data (Strictly non-diagnostic neutral wording)
-  const movementTrendData = [
-    { session: 'S1 (Mon)', angle: 142, targetMin: 140, targetMax: 160 },
-    { session: 'S2 (Tue)', angle: 148, targetMin: 140, targetMax: 160 },
-    { session: 'S3 (Wed)', angle: 151, targetMin: 140, targetMax: 160 },
-    { session: 'S4 (Thu)', angle: 154, targetMin: 140, targetMax: 160 },
-    { session: 'S5 (Fri)', angle: 157, targetMin: 140, targetMax: 160 },
-    { session: 'S6 (Sat)', angle: 159, targetMin: 140, targetMax: 160 },
-  ];
+  const [exporting, setExporting] = useState(false);
+  const [exportToast, setExportToast] = useState<string | null>(null);
 
-  // 2. Repetition Completion Data (Successful vs Incomplete)
-  const repetitionData = [
-    { day: 'Mon', successful: 10, incomplete: 2 },
-    { day: 'Tue', successful: 10, incomplete: 1 },
-    { day: 'Wed', successful: 10, incomplete: 0 },
-    { day: 'Thu', successful: 9, incomplete: 1 },
-    { day: 'Fri', successful: 10, incomplete: 0 },
-    { day: 'Sat', successful: 10, incomplete: 0 },
-    { day: 'Sun', successful: 10, incomplete: 0 },
-  ];
+  const handleConfetti = () => {
+    try {
+      confetti({
+        particleCount: 60,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#00685f', '#14B8A6', '#38BDF8', '#6ffbbe'],
+      });
+    } catch {
+      // Fallback if browser canvas is restricted
+    }
+  };
 
-  // 3. Sessions Over Time (Minutes spent per day)
-  const sessionsOverTimeData = [
-    { week: 'Week 1', sessions: 5, totalMinutes: 65 },
-    { week: 'Week 2', sessions: 6, totalMinutes: 80 },
-    { week: 'Week 3', sessions: 6, totalMinutes: 85 },
-    { week: 'Week 4', sessions: 7, totalMinutes: 95 },
-  ];
+  const handleExportPdf = () => {
+    setExporting(true);
+    setExportToast('Compiling 18-day Kinematic Packet (Encrypted PDF generated)...');
 
-  // 4. Adherence Rate Data (%)
-  const adherenceData = [
-    { period: 'Week 1', adherence: 82 },
-    { period: 'Week 2', adherence: 88 },
-    { period: 'Week 3', adherence: 90 },
-    { period: 'Week 4', adherence: 96 },
-  ];
+    setTimeout(() => {
+      setExportToast('Transmitted directly to Dr. Mehta\'s Clinical EMR portal!');
+    }, 1500);
+
+    setTimeout(() => {
+      setExportToast(null);
+      setExporting(false);
+    }, 4000);
+  };
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto py-2">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
-            <TrendingUp className="h-7 w-7 text-primary" />
-            Movement Performance Trends
+    <div className="flex flex-col w-full max-w-4xl mx-auto px-4 sm:px-6 pt-4 pb-28 gap-5">
+      {/* 1. Screen Context Title & Restorative Encouragement */}
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col">
+          <h1 className="font-headline text-2xl sm:text-3xl text-[#0b1c30] font-bold tracking-tight">
+            Kinematic Progress &amp; Recovery
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Objective kinematic telemetry measured locally across your exercise sessions.
+          <span className="font-body text-xs sm:text-sm text-[#565e74] flex items-center gap-2 mt-0.5">
+            <span className="w-2 h-2 rounded-full bg-[#00855b]"></span>
+            Telemetry synced with Dr. Mehta • Day 18 Post-Op
+          </span>
+        </div>
+        <button
+          onClick={handleConfetti}
+          className="w-11 h-11 rounded-full bg-[#008378] text-white flex items-center justify-center shadow-md active:scale-95 transition-transform"
+          title="Milestone Cheer"
+          aria-label="Celebrate recovery milestone"
+        >
+          <span className="material-symbols-outlined text-[22px]">celebration</span>
+        </button>
+      </div>
+
+      {/* 2. Top Stat Ribbon: Kinetic Triple Metric Cards */}
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+        {/* Stat 1: ROM Gain */}
+        <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#dce9ff] flex flex-col justify-between">
+          <div className="flex items-center gap-1.5 text-[#00685f]">
+            <span className="material-symbols-outlined text-[18px]">trending_up</span>
+            <span className="font-label-sm text-[11px] uppercase tracking-wider font-bold">ROM Gain</span>
+          </div>
+          <div className="my-1.5">
+            <div className="font-headline text-xl sm:text-2xl font-bold text-[#00685f] tracking-tight">+28%</div>
+            <div className="font-label-sm text-[11px] text-[#565e74] leading-tight">48° → 76° Peak</div>
+          </div>
+          <div className="w-full bg-[#eff4ff] rounded-full h-1.5 overflow-hidden">
+            <div className="bg-[#00685f] h-full rounded-full" style={{ width: '78%' }}></div>
+          </div>
+        </div>
+
+        {/* Stat 2: Adherence */}
+        <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#dce9ff] flex flex-col justify-between">
+          <div className="flex items-center gap-1.5 text-[#006947]">
+            <span className="material-symbols-outlined text-[18px]">verified</span>
+            <span className="font-label-sm text-[11px] uppercase tracking-wider font-bold">Adherence</span>
+          </div>
+          <div className="my-1.5">
+            <div className="font-headline text-xl sm:text-2xl font-bold text-[#006947] tracking-tight">96%</div>
+            <div className="font-label-sm text-[11px] text-[#565e74] leading-tight">17 of 18 done</div>
+          </div>
+          <div className="w-full bg-[#eff4ff] rounded-full h-1.5 overflow-hidden">
+            <div className="bg-[#00855b] h-full rounded-full" style={{ width: '96%' }}></div>
+          </div>
+        </div>
+
+        {/* Stat 3: Pain / Fatigue Index */}
+        <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#dce9ff] flex flex-col justify-between">
+          <div className="flex items-center gap-1.5 text-[#5c647a]">
+            <span className="material-symbols-outlined text-[18px]">sentiment_satisfied</span>
+            <span className="font-label-sm text-[11px] uppercase tracking-wider font-bold">Pain Index</span>
+          </div>
+          <div className="my-1.5">
+            <div className="font-headline text-xl sm:text-2xl font-bold text-[#0b1c30] tracking-tight">
+              1.4<span className="font-body text-xs text-[#565e74] font-normal">/5</span>
+            </div>
+            <div className="font-label-sm text-[11px] text-[#006947] leading-tight flex items-center gap-0.5">
+              <span className="material-symbols-outlined text-[13px]">arrow_downward</span> Mild • Falling
+            </div>
+          </div>
+          <div className="w-full bg-[#eff4ff] rounded-full h-1.5 overflow-hidden">
+            <div className="bg-[#565e74] h-full rounded-full" style={{ width: '28%' }}></div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Main Visual Chart Card: Shoulder Abduction Trajectory */}
+      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-md border border-[#dce9ff] flex flex-col gap-3">
+        <div className="flex items-start justify-between">
+          <div className="flex flex-col">
+            <h2 className="font-headline text-base sm:text-lg font-bold text-[#0b1c30]">
+              Active Shoulder Abduction ROM
+            </h2>
+            <span className="font-body text-xs text-[#565e74]">Kinematic arc across Days 1 – 18</span>
+          </div>
+          <span className="px-3 py-1 rounded-full bg-[#dae2fd] text-[#131b2e] font-label-sm text-xs font-semibold flex items-center gap-1.5 border border-[#dce9ff]">
+            <span className="w-2 h-2 rounded-full bg-[#00685f] animate-ping"></span>
+            Target: 80°
+          </span>
+        </div>
+
+        {/* Interactive Annotation Pill */}
+        <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#eff4ff] text-[#00685f] text-xs border border-[#dce9ff]">
+          <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+          <span className="font-headline text-xs font-bold flex-1">Optimal target corridor reached on Day 14!</span>
+          <span className="font-label-sm text-[11px] text-[#565e74]">Ahead of average</span>
+        </div>
+
+        {/* Inline Vector Trajectory Curve with Corridor Band */}
+        <div className="relative w-full h-52 bg-white rounded-xl pt-2">
+          <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 340 160">
+            <defs>
+              <linearGradient id="curveGradient" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#00685f" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#00685f" stopOpacity="0.0" />
+              </linearGradient>
+              <filter height="140%" id="glow" width="140%" x="-20%" y="-20%">
+                <feDropShadow dx="0" dy="2" floodColor="#00685f" floodOpacity="0.35" stdDeviation="3" />
+              </filter>
+            </defs>
+
+            {/* Shaded target corridor band (70° - 85°) */}
+            <rect fill="#dce9ff" fillOpacity="0.5" height="36" rx="6" width="340" x="0" y="24" />
+            <text fill="#565e74" fontFamily="Inter" fontSize="9" fontWeight="600" x="8" y="35">
+              TARGET RECOVERY CORRIDOR (70° - 85°)
+            </text>
+
+            {/* Horizontal Guides */}
+            {/* Target Goal Line (80°) */}
+            <line stroke="#008378" strokeDasharray="4,4" strokeOpacity="0.8" strokeWidth="1.5" x1="0" x2="340" y1="36" y2="36" />
+            <text fill="#00685f" fontFamily="Plus Jakarta Sans" fontSize="10" fontWeight="600" x="290" y="32">
+              80° Goal
+            </text>
+
+            {/* Day 1 Baseline Line (48°) */}
+            <line stroke="#bec6e0" strokeDasharray="3,3" strokeWidth="1.2" x1="0" x2="340" y1="125" y2="125" />
+            <text fill="#5c647a" fontFamily="Plus Jakarta Sans" fontSize="10" x="260" y="136">
+              Baseline 48°
+            </text>
+
+            {/* Gradient Area Fill */}
+            <path
+              d="M 15 125 C 55 120, 85 112, 120 98 C 160 82, 205 60, 240 48 C 275 39, 305 40, 325 40 L 325 150 L 15 150 Z"
+              fill="url(#curveGradient)"
+            />
+
+            {/* Trajectory Bezier Curve */}
+            <path
+              d="M 15 125 C 55 120, 85 112, 120 98 C 160 82, 205 60, 240 48 C 275 39, 305 40, 325 40"
+              fill="none"
+              filter="url(#glow)"
+              stroke="#00685f"
+              strokeLinecap="round"
+              strokeWidth="3.5"
+            />
+
+            {/* Milestones */}
+            <circle cx="15" cy="125" fill="#ffffff" r="4.5" stroke="#565e74" strokeWidth="2.5" />
+            <circle cx="120" cy="98" fill="#ffffff" r="3.5" stroke="#00685f" strokeWidth="2" />
+            <circle cx="240" cy="48" fill="#6ffbbe" r="4.5" stroke="#006947" strokeWidth="2" />
+            <circle cx="325" cy="40" fill="#89f5e7" fillOpacity="0.5" r="7" />
+            <circle cx="325" cy="40" fill="#ffffff" r="4.5" stroke="#00685f" strokeWidth="3" />
+          </svg>
+        </div>
+
+        {/* Timeline X-Axis & Today Indicator */}
+        <div className="flex justify-between items-center px-1 text-[#565e74] font-label-sm text-[11px] border-t border-[#eff4ff] pt-2">
+          <span>Day 1 (48°)</span>
+          <span>Day 6</span>
+          <span className="text-[#006947] font-semibold">Day 14 (Target Met)</span>
+          <span className="text-[#00685f] font-bold">Today: Day 18 (76°)</span>
+        </div>
+      </div>
+
+      {/* 4. Weekly Kinematic Breakdown: 3 Quality Pillars */}
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center justify-between">
+          <span className="font-headline text-base sm:text-lg font-bold text-[#0b1c30]">
+            Kinematic Telemetry Quality
+          </span>
+          <span className="font-label-sm text-xs text-[#006947] bg-[#eff4ff] border border-[#dce9ff] px-2.5 py-0.5 rounded-full font-semibold">
+            CV Engine • Validated
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+          {/* Quality Score */}
+          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-[#dce9ff] flex flex-col items-center text-center">
+            <div className="relative w-14 h-14 flex items-center justify-center my-1">
+              <svg className="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
+                <path className="text-[#eff4ff]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5" />
+                <path className="text-[#00685f]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray="92, 100" strokeLinecap="round" strokeWidth="3.5" />
+              </svg>
+              <span className="absolute font-headline text-base font-bold text-[#00685f]">92</span>
+            </div>
+            <span className="font-headline text-xs sm:text-sm font-bold text-[#0b1c30]">Form Quality</span>
+            <span className="font-label-sm text-[10px] text-[#565e74]">Top tier range</span>
+          </div>
+
+          {/* Velocity Stability */}
+          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-[#dce9ff] flex flex-col items-center text-center">
+            <div className="relative w-14 h-14 flex items-center justify-center my-1">
+              <svg className="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
+                <path className="text-[#eff4ff]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5" />
+                <path className="text-[#00855b]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray="94, 100" strokeLinecap="round" strokeWidth="3.5" />
+              </svg>
+              <span className="absolute font-headline text-base font-bold text-[#006947]">94%</span>
+            </div>
+            <span className="font-headline text-xs sm:text-sm font-bold text-[#0b1c30]">Cadence Smooth</span>
+            <span className="font-label-sm text-[10px] text-[#565e74]">Velocity steady</span>
+          </div>
+
+          {/* Trunk Compensation */}
+          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-[#dce9ff] flex flex-col items-center text-center">
+            <div className="relative w-14 h-14 flex items-center justify-center my-1">
+              <svg className="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
+                <path className="text-[#eff4ff]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5" />
+                <path className="text-[#008378]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray="4, 100" strokeLinecap="round" strokeWidth="3.5" />
+              </svg>
+              <span className="absolute font-headline text-base font-bold text-[#0b1c30]">4%</span>
+            </div>
+            <span className="font-headline text-xs sm:text-sm font-bold text-[#0b1c30]">Trunk Lean</span>
+            <span className="font-label-sm text-[10px] text-[#006947] font-semibold">Minimal • Safe</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Visual Delight & Recovery Affirmation Banner */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-[#008378] to-[#00685f] text-white rounded-3xl p-5 sm:p-6 shadow-md flex items-center gap-4">
+        <div className="flex-1 z-10">
+          <div className="flex items-center gap-1.5 text-[#89f5e7] mb-1">
+            <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
+            <span className="font-label-sm text-[11px] uppercase tracking-wider font-bold">Milestone Unlocked</span>
+          </div>
+          <h3 className="font-headline text-base sm:text-lg font-bold text-white">Functional Independence Band</h3>
+          <p className="font-body text-xs sm:text-sm text-[#f4fffc]/90 mt-0.5 leading-snug">
+            Your 76° abduction lets you perform unassisted overhead reach tasks safely!
           </p>
         </div>
+        <div className="w-16 h-16 rounded-full bg-white/15 flex items-center justify-center shrink-0 backdrop-blur-sm z-10">
+          <span className="material-symbols-outlined text-[32px] text-[#89f5e7]">accessibility_new</span>
+        </div>
+        <div className="absolute -right-6 -bottom-8 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+      </div>
 
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-medium text-slate-300">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span>Clinician-Verified Telemetry</span>
+      {/* 6. Recent Session History */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <span className="font-headline text-base sm:text-lg font-bold text-[#0b1c30]">Recent Session History</span>
+          <span className="font-label-sm text-xs text-[#00685f] font-bold">18 Completed</span>
+        </div>
+
+        {/* Session Item 1 */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#dce9ff] flex flex-col gap-2.5">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#eff4ff] flex items-center justify-center text-[#00685f]">
+                <span className="material-symbols-outlined text-[20px]">fitness_center</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-headline text-sm sm:text-base font-bold text-[#0b1c30] leading-tight">
+                  Shoulder Raise &amp; Wall Slides
+                </span>
+                <span className="font-body text-xs text-[#565e74]">Today • 10:35 AM • 18 min</span>
+              </div>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full bg-[#eff4ff] text-[#006947] font-label-sm text-xs flex items-center gap-1 font-semibold border border-[#dce9ff]">
+              <span className="material-symbols-outlined text-[13px]">cloud_done</span>
+              Synced
+            </span>
+          </div>
+
+          <div className="grid grid-cols-4 gap-1.5 pt-1 bg-[#eff4ff] p-2.5 rounded-xl text-center border border-[#dce9ff]/60">
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[10px] text-[#565e74] uppercase">Reps</span>
+              <span className="font-headline text-xs sm:text-sm font-bold text-[#0b1c30]">10/10</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[10px] text-[#565e74] uppercase">Peak ROM</span>
+              <span className="font-headline text-xs sm:text-sm font-bold text-[#00685f]">76°</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[10px] text-[#565e74] uppercase">Confidence</span>
+              <span className="font-headline text-xs sm:text-sm font-bold text-[#006947]">94%</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[10px] text-[#565e74] uppercase">Reported</span>
+              <span className="font-headline text-xs sm:text-sm font-semibold text-[#565e74]">Mild 2/5</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Session Item 2 */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#dce9ff] flex flex-col gap-2.5">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#eff4ff] flex items-center justify-center text-[#00685f]">
+                <span className="material-symbols-outlined text-[20px]">sync</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-headline text-sm sm:text-base font-bold text-[#0b1c30] leading-tight">
+                  External Rotation &amp; Scapular Hold
+                </span>
+                <span className="font-body text-xs text-[#565e74]">Yesterday • 4:15 PM • 15 min</span>
+              </div>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full bg-[#eff4ff] text-[#006947] font-label-sm text-xs flex items-center gap-1 font-semibold border border-[#dce9ff]">
+              <span className="material-symbols-outlined text-[13px]">cloud_done</span>
+              Synced
+            </span>
+          </div>
+
+          <div className="grid grid-cols-4 gap-1.5 pt-1 bg-[#eff4ff] p-2.5 rounded-xl text-center border border-[#dce9ff]/60">
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[10px] text-[#565e74] uppercase">Reps</span>
+              <span className="font-headline text-xs sm:text-sm font-bold text-[#0b1c30]">12/12</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[10px] text-[#565e74] uppercase">Peak ROM</span>
+              <span className="font-headline text-xs sm:text-sm font-bold text-[#00685f]">74°</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[10px] text-[#565e74] uppercase">Confidence</span>
+              <span className="font-headline text-xs sm:text-sm font-bold text-[#006947]">91%</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[10px] text-[#565e74] uppercase">Reported</span>
+              <span className="font-headline text-xs sm:text-sm font-semibold text-[#565e74]">Min 1/5</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Mandatory Non-Diagnostic Clinical Boundary Notice */}
-      <Alert variant="info" title="Clinical Measurement Notice">
-        Statistical trends represent objective joint angle and repetition tracking detected by computer vision. They are provided as a neutral <strong>Movement performance trend</strong> and do not constitute an automated medical diagnosis or clinical discharge clearance.
-      </Alert>
+      {/* 7. Export Telemetry Action & Clinician Note */}
+      <div className="flex flex-col gap-2.5 pt-1">
+        <button
+          onClick={handleExportPdf}
+          disabled={exporting}
+          className="w-full h-13 bg-[#00685f] hover:bg-[#005049] text-white rounded-2xl font-headline text-sm font-semibold flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-all disabled:opacity-75"
+          id="export-pdf-btn"
+        >
+          <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+          <span>{exporting ? 'Processing Encrypted PDF...' : 'Export Telemetry PDF for Dr. Mehta'}</span>
+        </button>
 
-      {/* KPI Highlights */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60">
-          <span className="text-xs text-slate-400 block font-medium">Weekly Adherence</span>
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-emerald-400 font-mono">92%</span>
-            <span className="text-xs text-emerald-500 font-semibold">↑ High</span>
+        {exportToast && (
+          <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-[#e5eeff] text-[#0b1c30] text-xs border border-[#dce9ff] transition-all">
+            <span className="material-symbols-outlined text-[#00685f] text-[18px]">check_circle</span>
+            <span className="font-medium">{exportToast}</span>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">6 of 7 scheduled sessions</span>
-        </div>
+        )}
 
-        <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60">
-          <span className="text-xs text-slate-400 block font-medium">Clean Rep Ratio</span>
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-blue-400 font-mono">96%</span>
-            <span className="text-xs text-slate-400">of reps</span>
-          </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">Reached full target range</span>
-        </div>
-
-        <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60">
-          <span className="text-xs text-slate-400 block font-medium">Average Cadence</span>
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-purple-400 font-mono">4.2s</span>
-            <span className="text-xs text-slate-400">/ rep</span>
-          </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">Smooth controlled speed</span>
-        </div>
-
-        <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60">
-          <span className="text-xs text-slate-400 block font-medium">Average Discomfort (VAS)</span>
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-amber-400 font-mono">1.8</span>
-            <span className="text-xs text-slate-400">/ 10</span>
-          </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">Within safe threshold (&lt;5)</span>
+        <div className="flex items-center justify-center gap-1.5 text-[#565e74] pt-1">
+          <span className="material-symbols-outlined text-[16px] text-[#00685f]">security</span>
+          <span className="font-label-sm text-[11px]">HIPAA • 256-Bit Cryptographic Telemetry Signature</span>
         </div>
       </div>
-
-      {/* Chart 1: Movement Performance Trend */}
-      <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Target className="w-4 h-4 text-primary" />
-                Movement Performance Trend
-              </CardTitle>
-              <CardDescription>
-                Primary joint angle trajectory across completed sessions compared with target range envelope.
-              </CardDescription>
-            </div>
-            <Badge variant="success">Within Configured Target Range</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 sm:h-72 w-full pt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={movementTrendData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                <XAxis dataKey="session" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#94a3b8" fontSize={11} domain={[130, 170]} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '0.75rem',
-                    color: '#fff',
-                    fontSize: '12px',
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }} />
-                <ReferenceLine y={160} stroke="#10b981" strokeDasharray="4 4" label={{ value: 'Target Max', fill: '#10b981', fontSize: 10 }} />
-                <ReferenceLine y={140} stroke="#38bdf8" strokeDasharray="4 4" label={{ value: 'Target Min', fill: '#38bdf8', fontSize: 10 }} />
-                <Line
-                  type="monotone"
-                  dataKey="angle"
-                  name="Detected Joint Angle (°)"
-                  stroke="#38bdf8"
-                  strokeWidth={3}
-                  dot={{ r: 5, fill: '#0284c7', stroke: '#fff', strokeWidth: 2 }}
-                  activeDot={{ r: 7 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Grid: Chart 2 (Repetition Completion) & Chart 3 (Sessions Over Time) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Chart 2: Repetition Completion */}
-        <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              Repetition Completion
-            </CardTitle>
-            <CardDescription>
-              Successful full-range repetitions vs incomplete movements by day.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-60 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={repetitionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                  <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      borderColor: '#334155',
-                      borderRadius: '0.75rem',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }} />
-                  <Bar dataKey="successful" name="Successful Reps" fill="#10b981" radius={[4, 4, 0, 0]} stackId="a" />
-                  <Bar dataKey="incomplete" name="Incomplete Reps" fill="#f59e0b" radius={[4, 4, 0, 0]} stackId="a" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Chart 3: Sessions Over Time */}
-        <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-400" />
-              Sessions Over Time
-            </CardTitle>
-            <CardDescription>
-              Weekly completed session frequency and active rehabilitation minutes.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-60 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sessionsOverTimeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                  <XAxis dataKey="week" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      borderColor: '#334155',
-                      borderRadius: '0.75rem',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }} />
-                  <Bar dataKey="sessions" name="Sessions Done" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="totalMinutes" name="Active Minutes" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Chart 4: Adherence Trend */}
-      <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Activity className="w-4 h-4 text-purple-400" />
-            Adherence & Protocol Compliance
-          </CardTitle>
-          <CardDescription>
-            Percentage of prescribed rehabilitation sessions completed on schedule.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-56 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={adherenceData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                <XAxis dataKey="period" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#94a3b8" fontSize={11} domain={[70, 100]} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '0.75rem',
-                    fontSize: '12px',
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="adherence"
-                  name="Adherence Rate (%)"
-                  stroke="#a855f7"
-                  strokeWidth={3}
-                  dot={{ r: 5, fill: '#9333ea', stroke: '#fff', strokeWidth: 2 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
